@@ -239,3 +239,17 @@ html:has(#bosque:not([hidden])){scroll-padding-top:var(--top-h,78px)}
 /* Celular em pé com um campo de texto em foco: o mapa recolhe para a fila de paradas, para o teclado não cobrir o campo. */
 /* A folga embaixo deixa qualquer campo subir para o alto da área; o teclado cobre essa parte. */
 @media(max-width:899px) and (orientation:portrait){#world-stage[data-typing] :is(.world-viewport,.world-camera){display:none}#world-stage[data-typing] #experiment-fields{padding-bottom:50vh;padding-bottom:50svh}}
+/* Lote 5.6: o espaço do Duolingo no painel da pergunta. Um campo por linha, o mesmo respiro entre os blocos e escolhas com o
+   mesmo espaço nas duas direções; só Continuar pesa como ação principal. O cabeçalho e o primeiro bloco não descem: em 844×390
+   e 1280×720 a primeira resposta continua à vista sem rolar a página (Lote 5.5). */
+#world-stage{--respiro:24px}
+#world-stage #experiment-fields>:is(fieldset,label,div){margin:var(--respiro) 0 0}
+#world-stage #experiment-fields>.step-hint+*{margin-top:12px}
+#world-stage #experiment-fields>:empty{display:none}
+#world-stage .choice-grid{gap:12px}
+/* Os campos ficam numa coluna de até 860 px; o resumo da revisão usa a largura toda, e cada cartão começa pelo título
+   mesmo quando o vizinho da linha é mais alto. */
+@media(min-width:900px){#world-stage #experiment-fields>:is(fieldset,label,div){grid-column:1/-1;width:100%;max-width:860px}#world-stage #experiment-fields>.lab-review{max-width:none}}
+#world-stage .review-section{align-content:start}
+/* Sem WebGL o pôster cobre a faixa inteira, como o 3D: corta as pontas da floresta em vez de deixar faixas creme (QA M3). */
+#world-stage #world-poster{object-fit:cover;padding:0}

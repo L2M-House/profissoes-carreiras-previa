@@ -181,20 +181,28 @@ function syncWorld(){
  if(worldFailed)return;
  if(!worldView){
   if(worldLoading)return;worldLoading=true;
-  const script=document.createElement('script');script.src='media/world/bosque.bundle.js?v=7';
+  const script=document.createElement('script');script.src='media/world/bosque.bundle.js?v=8';
   script.onerror=()=>worldFallback('Não foi possível abrir o 3D. As paradas e as perguntas continuam disponíveis.');
-  script.onload=()=>{try{buildMapLayer();worldView=Bosque.create($('world-viewport'),{onSelect:goStop,onError:worldFallback,onView:paintWorldCamera,onFrame:layoutMap,onWalk:onRumoWalk});window.mapWorld=worldView;$('world-viewport').dataset.ready='true';paintWorld();const done=worldDomain().recorded&&!lab.started;mapQuiet=true;worldView.select(done?6:lab.step,{instant:true});mapQuiet=false;if(done)worldView.camera('center');syncWorld();}catch{worldFallback('Seu navegador não abriu o 3D. Use a lista de paradas.');}};
+  script.onload=()=>{try{buildMapLayer();worldView=Bosque.create($('world-viewport'),{onSelect:goStop,onError:worldFallback,onView:paintWorldCamera,onFrame:layoutMap,onWalk:onRumoWalk});window.mapWorld=worldView;measureInsets();$('world-viewport').dataset.ready='true';paintWorld();const done=worldDomain().recorded&&!lab.started;mapQuiet=true;worldView.select(done?6:lab.step,{instant:true});mapQuiet=false;if(done)worldView.camera('center');syncWorld();}catch{worldFallback('Seu navegador não abriu o 3D. Use a lista de paradas.');}};
   document.head.append(script);return;
  }
- worldView.setActive(true);worldView.setMotion(!motionOff());
+ worldView.setActive(true);worldView.setMotion(!motionOff());measureInsets();
  if(worldCelebrationPending)celebrateWorldIfPending();
 }
 window.refreshWorld=syncWorld;
+// Lote 5.6: os botões da câmera ficam sobre a base do mapa; a câmera enquadra paradas e personagens acima deles.
+// A grade de "Ajustar visão" aberta não conta: ela abre por cima e fecha logo.
+function measureInsets(){
+ const vp=$('world-viewport').getBoundingClientRect();if(!worldView||!vp.height)return;
+ const tops=[...$('world-camera').querySelectorAll(':scope>button,.world-adjust>summary')].filter(e=>e.checkVisibility()).map(e=>e.getBoundingClientRect()).filter(r=>r.top<vp.bottom&&r.bottom>vp.top).map(r=>r.top);
+ worldView.setInsets({bottom:tops.length?Math.max(0,vp.bottom-Math.min(...tops)):0});
+}
+addEventListener('resize',measureInsets);
 function paintWorldCamera(state){
  $('world-overview').textContent=state.overview?'Voltar à parada':'Ver bosque';
  $('world-explore').setAttribute('aria-pressed',String(!!state.exploring));$('world-explore').innerHTML=state.exploring?'Sair<span class="cam-extra"> da exploração</span>':'Explorar<span class="cam-extra"> mapa</span>';
  const hint='Exploração livre: arraste em qualquer direção e use dois dedos para aproximar. Toque em Sair quando terminar.';
- if(worldFailed)return;if(state.exploring)setWorldStatus(hint);else if($('world-status').textContent===hint)setWorldStatus('');
+ if(worldFailed)return;measureInsets();if(state.exploring)setWorldStatus(hint);else if($('world-status').textContent===hint)setWorldStatus('');
 }
 window.addEventListener('lab:step',()=>{if(!worldOwnsForm())return;$('experiment-back').hidden=lab.step===0;
  // Lote 5.5: Voltar, Deixar para depois e Continuar ficam presos no rodapé do bloco; a pergunta nova começa do topo.
