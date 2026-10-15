@@ -1,0 +1,32 @@
+/* Elenco do Lote 5.3. O grupo externo de cada peça guarda o estado; o .mov recebe os gestos, no mesmo pivô. */
+.cast-svg{display:block;width:100%;height:auto;overflow:visible}
+.cast-svg .mov{transform-origin:inherit}
+.cast-svg[data-facing=left]{transform:scaleX(-1)}
+/* Marcas de mangá: transparentes até uma pose ou um gesto as chamar. */
+.cast-svg .marca{pointer-events:none}.cast-svg .marca>.mov{opacity:0}
+.companion .cast-body,.companion .bob,.companion .torso,.companion .head,.companion .gaze,.companion .eyes,.companion .needle,.companion .eye-open,.companion .eye-happy,.companion .stars{transition:transform 180ms cubic-bezier(.2,.8,.2,1),opacity 180ms}
+.companion .stars{opacity:0}
+.companion[data-state=celebrate] .stars{opacity:1}
+
+/* Olhar e inclinação de cada estado. */
+.companion[data-state=attentive] :is(.gaze,.eyes),.companion[data-state=point] :is(.gaze,.eyes){transform:translateX(4px)}
+.companion[data-state=curious] :is(.gaze,.eyes){transform:translate(3px,-3px)}
+.companion[data-state=thinking] :is(.gaze,.eyes){transform:translate(-3px,-5px)}
+.companion[data-state=encourage] :is(.gaze,.eyes){transform:translateY(2px)}
+.companion[data-state=curious] .needle{transform:rotate(18deg)}
+.companion[data-state=thinking] .needle{transform:rotate(-24deg)}
+.companion[data-state=point] .needle{transform:rotate(25deg)}
+.companion[data-state=celebrate] .needle{transform:rotate(10deg)}
+.companion[data-character=teo][data-state=thinking] .head{transform:rotate(-7deg)}
+
+/* Boca: Rumo, Pipa e Téo. Bino não tem boca; a alegria dele aparece nos olhos. */
+.companion[data-state=thinking] .rumo .mouth{d:path('M108 161Q120 155 132 161')}
+.companion[data-state=curious] .rumo .mouth{d:path('M113 156Q120 170 127 156Q120 148 113 156')}
+.companion[data-state=attentive] .rumo .mouth{d:path('M105 158Q120 165 135 158')}
+.companion[data-state=celebrate] .rumo .mouth{d:path('M101 153Q120 181 139 153Z');fill:#1c2744}
+.companion[data-character=pipa][data-state=thinking] .mouth{d:path('M111 106Q120 102 129 106')}
+.companion[data-character=pipa][data-state=celebrate] .mouth{d:path('M108 101Q120 119 132 101Z');fill:#1c2744}
+.companion[data-character=teo][data-state=thinking] .mouth{d:path('M164 139Q173 136 182 138')}
+.companion[data-character=teo][data-state=celebrate] .mouth{d:path('M157 133Q170 151 183 132Z');fill:#1c2744}
+.companion[data-character=bino][data-state=celebrate] .eye-open{opacity:0}
+.companion[data-character=bino][data-state=celebrate] .eye-happy{opacity:1}
