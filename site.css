@@ -76,6 +76,15 @@ footer{display:flex;align-items:center;justify-content:space-between;gap:24px;pa
 @media(max-width:599px){.world-scene{border-radius:22px}.world-camera{left:8px;right:8px;bottom:8px;gap:4px}.world-camera button,.world-adjust summary{padding:6px 8px;font-size:11px}.world-heading{margin-bottom:10px}.world-heading h2{font-size:22px}.world-viewport{height:min(280px,40vh)}body[data-programa=filho] #trilha .trail-head .lead{display:none}#trilha .trail-head{margin-bottom:16px}#trilha .trail-head h1{font-size:30px;margin-bottom:0}#trilha .switch{margin-top:12px}}
 @media(max-height:520px) and (max-width:950px){.world-viewport{height:220px;min-height:0}}
 #world-question h1{scroll-margin:96px 0 104px}
+/* Lote 5.4: personagens em pé no bosque, numa camada sobre o canvas. z-index 0 prende a ordem dos personagens à camada: os controles da câmera continuam por cima. */
+.world-layer{position:absolute;inset:0;z-index:0;overflow:hidden;pointer-events:none}
+.world-viewport[data-fallback=true]>.world-layer{display:none}
+.map-figure{position:absolute;left:0;top:0;width:120px;transform-origin:0 0}
+.map-body{transform-origin:50% 91.5%}
+.world-layer .companion[data-state=celebrate] .bob{animation:none}
+.map-fx{position:absolute;left:0;top:0;transform-origin:0 0}.map-fx>svg{position:absolute;left:-60px;top:-60px;width:120px;height:120px;overflow:visible}
+.node-glyph{display:grid;place-items:center}
+.visually-hidden{position:absolute;width:1px;height:1px;margin:-1px;overflow:hidden;clip-path:inset(50%);white-space:nowrap}
 @media(prefers-reduced-motion:reduce){.world-node,.world-camera button{transition:none}}
 @media(max-width:899px){nav #nav-nome{min-width:0;max-width:100%;white-space:nowrap}}
 #experiment-form>.fine{margin-top:12px}

@@ -1,9 +1,17 @@
 import * as T from 'three';
 
 // Renderer only. One curve owns the visible trail and the seven stops; state comes from the bridge.
+// Lote 5.4: the characters are an SVG layer drawn by the bridge; the renderer only projects their anchors.
 const STOP_U=[0,.42,.551,.665,.775,.885,1];
 const ZONES={leaf:'#2ebe6a',coral:'#f2534a',sun:'#ffc83d',ink:'#1c2744'};
-window.Bosque={create(host,{onSelect,onError,onView=()=>{}}){
+// Where Bino, Pipa and Téo stand in their lands (x, z), on low ground and clear of the stop flags and badges. Chosen so
+// that, in the focus of each of their stops, they stand beside Rumo on screen, never in front of him, and nothing taller
+// stands between them and the camera: Bino in front of the mill, Pipa flying over the river above the bridge, Téo on the
+// meadow below Acampamento and Mirante, above the camera buttons.
+const GUIDE_AT={bino:[-1.8,2.6],pipa:[.1,-1.2],teo:[3.95,-.15]};
+// Rumo's walk: a short crouch, then a run whose duration grows slower than the distance (farther = faster).
+const ANTES=.09,runTime=du=>.22+.24*Math.sqrt(du);
+window.Bosque={create(host,{onSelect,onError,onView=()=>{},onFrame=()=>{},onWalk=()=>{}}){
  const scene=new T.Scene(),camera=new T.OrthographicCamera(-6,6,4,-4,.1,80);
  const renderer=new T.WebGLRenderer({antialias:true,alpha:true});
  renderer.setPixelRatio(Math.min(devicePixelRatio,innerWidth<600?1.5:2));renderer.outputColorSpace=T.SRGBColorSpace;
@@ -21,6 +29,8 @@ window.Bosque={create(host,{onSelect,onError,onView=()=>{}}){
  const trail=Array.from({length:181},(_,i)=>curve.getPointAt(i/180));
  const stops=STOP_U.map((u,index)=>{const p=curve.getPointAt(u),t=curve.getTangentAt(u);return {index,u,x:p.x,z:p.z,side:new T.Vector3(-t.z,0,t.x)};}),targets=[];
  const nearTrail=(x,z)=>Math.min(...trail.map(p=>Math.hypot(p.x-x,p.z-z)));
+ const guides=Object.fromEntries(Object.entries(GUIDE_AT).map(([name,[x,z]])=>[name,new T.Vector3(x,.35,z)]));
+ const clearSpots=[...stops,...Object.values(guides)];
  const tiles=[];
  for(let q=-5;q<=5;q++)for(let r=-5;r<=5;r++){
   if(Math.max(Math.abs(q),Math.abs(r),Math.abs(q+r))>5)continue;
@@ -28,8 +38,8 @@ window.Bosque={create(host,{onSelect,onError,onView=()=>{}}){
   tiles.push({x,z,height:river?.13:h});
   part(hex,palette.earth,x,((river?.03:h)-.85)/2,z,1,(river?.03:h)+.85,1);
   part(hex,river?palette.water:h>1?palette.high:h>.5?palette.grass:palette.light,x,river?.13:h-.025,z,1,.05,1);
-  // Keep the camera side of every stop clear: no crown may stand between the view and a stop.
-  if(river||near<1.55||stops.some(s=>{const dx=x-s.x,dz=z-s.z;return Math.hypot(dx,dz)<2.4&&dx*Math.sin(.55)+dz*Math.cos(.55)>0;}))continue;
+  // Keep the camera side of every stop and every character clear: the SVG layer has no occlusion (Lote 5.4).
+  if(river||near<1.55||clearSpots.some(s=>{const dx=x-s.x,dz=z-s.z;return Math.hypot(dx,dz)<2.4&&dx*Math.sin(.55)+dz*Math.cos(.55)>0;}))continue;
   const seed=Math.abs(q*13+r*7),s=.7+(seed%4)*.12;
   if(seed%5<2){
    part(trunk,palette.wood,x,h+.4*s,z,1,.8*s,1);
@@ -38,6 +48,7 @@ window.Bosque={create(host,{onSelect,onError,onView=()=>{}}){
    else{part(round,palette.leaf,x,h+1.15*s,z,s*.65,s*1.5,s*.65,seed);part(round,palette.leaf2,x-.15,h+.8*s,z,s*.75,s*.6,s*.75,seed);}
   }else part(rock,palette.rock,x+.1,h+.18,z,.9,.7,1.1,seed);
  }
+ for(const g of Object.values(guides)){const t=tiles.reduce((a,b)=>Math.hypot(b.x-g.x,b.z-g.z)<Math.hypot(a.x-g.x,a.z-g.z)?b:a);g.y=Math.max(.35,t.height);}
  // A ribbon, not disconnected stepping stones.
  const vertices=[],normals=[];
  for(let i=0;i<180;i++){
@@ -88,43 +99,60 @@ window.Bosque={create(host,{onSelect,onError,onView=()=>{}}){
  beam(.25,-.27,4.85,.58,.85,.025,palette.water);beam(.25,-.71,4.87,.72,.07,.12,palette.ivory);
  const stream=new T.Group();stream.name='corrente';scene.add(stream);
  const currents=new T.InstancedMesh(box,palette.ivory,8);for(let i=0;i<8;i++){dummy.position.set((i%3-1)*.16,.163,-3+i*.77);dummy.scale.set(.09,.009,.18);dummy.rotation.set(0,0,0);dummy.updateMatrix();currents.setMatrixAt(i,dummy.matrix);}stream.add(currents);
- let reeds;const reedBase=batches.get(box.uuid+palette.high.uuid)?.items;
- for(const b of batches.values()){const mesh=new T.InstancedMesh(b.g,b.m,b.items.length);b.items.forEach(([x,y,z,sx,sy,sz,rx,ry,rz],i)=>{dummy.position.set(x,y,z);dummy.scale.set(sx,sy,sz);dummy.rotation.set(rx,ry,rz);dummy.updateMatrix();mesh.setMatrixAt(i,dummy.matrix)});scene.add(mesh);if(b.g===box&&b.m===palette.high)reeds=mesh;}
+ // Static parts become one mesh per material (Lote 5.4: draw calls); the reeds keep their instances to sway.
+ let reeds;const reedBase=batches.get(box.uuid+palette.high.uuid)?.items,flat=new Map(),byMat=new Map();
+ const matrixOf=([x,y,z,sx,sy,sz,rx,ry,rz])=>{dummy.position.set(x,y,z);dummy.scale.set(sx,sy,sz);dummy.rotation.set(rx,ry,rz);dummy.updateMatrix();return dummy.matrix;};
+ for(const b of batches.values()){
+  if(b.g===box&&b.m===palette.high){reeds=new T.InstancedMesh(b.g,b.m,b.items.length);b.items.forEach((it,i)=>reeds.setMatrixAt(i,matrixOf(it)));scene.add(reeds);continue;}
+  if(!flat.has(b.g))flat.set(b.g,b.g.index?b.g.toNonIndexed():b.g);
+  const pos=flat.get(b.g).attributes.position;if(!byMat.has(b.m))byMat.set(b.m,[]);for(const it of b.items)byMat.get(b.m).push(pos.clone().applyMatrix4(matrixOf(it)).array);
+ }
+ for(const [m,arrays] of byMat){const all=new Float32Array(arrays.reduce((n,a)=>n+a.length,0));let o=0;for(const a of arrays){all.set(a,o);o+=a.length;}const g=new T.BufferGeometry();g.setAttribute('position',new T.BufferAttribute(all,3));g.computeVertexNormals();scene.add(new T.Mesh(g,m));}
  // Stop markers: plaza, zone ring, pole, flag, lantern and a badge whose glyph names the state.
+ // Lote 5.4: one InstancedMesh per part and one quad set for the seven badges (6 draw calls instead of 42).
+ // Each stop keeps plain Object3D handles (ring, flag, lamp, badge...) that the code and the tests move as before.
  const plazaGeo=new T.CylinderGeometry(.38,.38,.03,8),ringGeo=new T.TorusGeometry(.38,.045,5,24),poleGeo=new T.CylinderGeometry(.025,.025,.85,5),flagGeo=new T.PlaneGeometry(.3,.19),lampGeo=new T.SphereGeometry(.08,8,6),lampMat=mat(colors.sun,{emissive:colors.sun,emissiveIntensity:.9});
- const flags=[];
+ const PARTS={plaza:[plazaGeo,palette.path],ring:[ringGeo,mat('#ffffff')],pole:[poleGeo,palette.wood],flag:[flagGeo,mat('#ffffff',{side:T.DoubleSide})],lamp:[lampGeo,lampMat]};
+ const tint=new T.Color('#ffffff'),marks=Object.fromEntries(Object.entries(PARTS).map(([k,[g,m]])=>{const mesh=new T.InstancedMesh(g,m,stops.length);mesh.name='paradas-'+k;mesh.frustumCulled=false;if(k==='ring'||k==='flag')stops.forEach((_,i)=>mesh.setColorAt(i,tint));scene.add(mesh);return [k,mesh];}));
+ const atlas=document.createElement('canvas');atlas.width=128*stops.length;atlas.height=128;const atlasTexture=new T.CanvasTexture(atlas);atlasTexture.colorSpace=T.SRGBColorSpace;
+ const badgeGeo=new T.BufferGeometry(),badgePos=new Float32Array(stops.length*12),uv=[],quads=[];
+ stops.forEach((_,i)=>{const a=i/stops.length,b=(i+1)/stops.length;uv.push(a,0,b,0,b,1,a,1);quads.push(i*4,i*4+1,i*4+2,i*4,i*4+2,i*4+3);});
+ badgeGeo.setAttribute('position',new T.BufferAttribute(badgePos,3));badgeGeo.setAttribute('uv',new T.Float32BufferAttribute(uv,2));badgeGeo.setIndex(quads);
+ const badges=new T.Mesh(badgeGeo,new T.MeshBasicMaterial({map:atlasTexture,transparent:true,depthTest:false}));badges.name='paradas-selos';badges.renderOrder=2;badges.frustumCulled=false;scene.add(badges);
+ const flags=[],hidden=new T.Matrix4().makeScale(0,0,0);
  for(const stop of stops){
-  const g=new T.Group();g.position.set(stop.x,0,stop.z);scene.add(g);
-  const plaza=new T.Mesh(plazaGeo,palette.path);plaza.position.y=.362;g.add(plaza);
-  stop.ring=new T.Mesh(ringGeo,mat(colors.ivory));stop.ring.rotation.x=Math.PI/2;stop.ring.position.y=.39;g.add(stop.ring);
+  const g=stop.group=new T.Group();g.position.set(stop.x,0,stop.z);
+  const handle=(k,x,y,z)=>{const o=stop[k]=new T.Object3D();o.position.set(x,y,z);g.add(o);return o;};
   const px=stop.side.x*.6,pz=stop.side.z*.6;
-  const pole=new T.Mesh(poleGeo,palette.wood);pole.position.set(px,.78,pz);g.add(pole);
-  stop.flag=new T.Mesh(flagGeo,mat(colors.coral,{side:T.DoubleSide}));stop.flag.position.set(px+.16,1.12,pz);g.add(stop.flag);flags.push(stop.flag);
-  stop.lamp=new T.Mesh(lampGeo,lampMat);stop.lamp.position.set(px,1.24,pz);stop.lamp.visible=false;g.add(stop.lamp);
-  stop.label=document.createElement('canvas');stop.label.width=stop.label.height=128;stop.texture=new T.CanvasTexture(stop.label);stop.texture.colorSpace=T.SRGBColorSpace;
-  stop.badge=new T.Sprite(new T.SpriteMaterial({map:stop.texture,depthTest:false}));stop.badge.position.set(px,1.5,pz);stop.badge.scale.setScalar(.5);stop.badge.renderOrder=2;g.add(stop.badge);
-  stop.markers=[stop.badge,pole,stop.flag,stop.lamp];
+  handle('plaza',0,.362,0);handle('ring',0,.39,0).rotation.x=Math.PI/2;handle('pole',px,.78,pz);flags.push(handle('flag',px+.16,1.12,pz));
+  handle('lamp',px,1.24,pz).visible=false;handle('badge',px,1.5,pz).scale.setScalar(.5);
+  stop.markers=[stop.badge,stop.pole,stop.flag,stop.lamp];
   const hit=new T.Mesh(new T.CylinderGeometry(.5,.5,1.4,8),new T.MeshBasicMaterial({visible:false}));hit.userData.stop=stop.index;hit.position.set(stop.x,.9,stop.z);scene.add(hit);targets.push(hit);
  }
+ const camRight=new T.Vector3(),camUp=new T.Vector3(),spot=new T.Vector3();
+ // Writes the handles into the instances and turns the badges to the camera, like sprites.
+ function syncStops(){
+  camRight.setFromMatrixColumn(camera.matrixWorld,0);camUp.setFromMatrixColumn(camera.matrixWorld,1);
+  for(const s of stops){
+   s.group.updateMatrixWorld(true);for(const k in marks)marks[k].setMatrixAt(s.index,s[k].visible?s[k].matrixWorld:hidden);
+   const c=s.badge.getWorldPosition(spot),h=s.badge.visible?s.badge.scale.x/2:0;
+   [[-1,-1],[1,-1],[1,1],[-1,1]].forEach(([a,b],j)=>{for(let k=0;k<3;k++)badgePos[s.index*12+j*3+k]=c.getComponent(k)+(camRight.getComponent(k)*a+camUp.getComponent(k)*b)*h;});
+  }
+  for(const k in marks)marks[k].instanceMatrix.needsUpdate=true;badgeGeo.attributes.position.needsUpdate=true;
+ }
  function drawBadge(stop,{state,zone}){
-  const c=stop.label.getContext('2d'),locked=state==='bloqueada',focus=state==='foco';
+  const c=atlas.getContext('2d'),locked=state==='bloqueada',focus=state==='foco';
+  c.save();c.translate(stop.index*128,0);
   c.clearRect(0,0,128,128);c.beginPath();c.arc(64,64,54,0,Math.PI*2);c.fillStyle=focus?colors.sun:colors.ivory;c.fill();c.lineWidth=12;c.strokeStyle=ZONES[zone]||colors.ink;c.stroke();
   c.fillStyle=colors.ink;c.strokeStyle=colors.ink;c.textAlign='center';c.textBaseline='middle';
   if(locked){c.lineWidth=7;c.beginPath();c.arc(64,54,14,Math.PI,0);c.stroke();c.fillRect(44,56,40,30);}
   else{const glyph={guardado:'✓',rascunho:'✎',adiado:'↷'}[state]||String(stop.index+1);c.font=`900 ${glyph.length>1?40:58}px Nunito, sans-serif`;c.fillText(glyph,64,68);}
-  stop.texture.needsUpdate=true;
+  c.restore();atlasTexture.needsUpdate=true;
  }
- // The player's piece: Rumo as a low poly board-game pawn (replaces the animals, Lote 5.2).
- const piece=new T.Group();piece.name='peça-bússola';scene.add(piece);
- {const add=(geo,m,y,rx=0,z=0)=>{const o=new T.Mesh(geo,m);o.position.set(0,y,z);o.rotation.x=rx;piece.add(o);return o;};
-  add(new T.CylinderGeometry(.3,.35,.12,6),palette.ink,.06);add(new T.CylinderGeometry(.09,.15,.26,8),palette.coralDeep,.25);
-  add(new T.CylinderGeometry(.36,.36,.14,16),palette.coral,.66,Math.PI/2);add(new T.CylinderGeometry(.26,.26,.15,16),palette.ivory,.66,Math.PI/2,.01);
-  const north=add(new T.ConeGeometry(.075,.26,4),palette.sun,.78,0,.1);north.rotation.y=Math.PI/4;
-  const south=add(new T.ConeGeometry(.075,.2,4),palette.ink,.55,0,.1);south.rotation.set(Math.PI,Math.PI/4,0);
-  add(new T.SphereGeometry(.045,8,6),palette.ivory,.67,0,.12);}
- const shadow=new T.Mesh(new T.CircleGeometry(.36,20),new T.MeshBasicMaterial({color:colors.ink,transparent:true,opacity:.18,depthWrite:false}));shadow.rotation.x=-Math.PI/2;shadow.position.y=.37;scene.add(shadow);
+ // Rumo replaced the compass piece (Lote 5.4): the bridge draws him in SVG; the scene keeps only his anchor, with no mesh.
+ const piece=new T.Object3D();piece.name='rumo';scene.add(piece);
  let selected=0,activeScene=false,visible=true,motion=true,manual=false,raf=0,last=0,frames=0,ambient=12,ambientPhase=0,states=stops.map(()=>({state:'disponível',zone:'leaf'}));
- let hop=null,cam=null,gesture=null;
+ let walk=null,cam=null,pieceU=STOP_U[0],frameKey='';
  const piecePos=new T.Vector3(stops[0].x,.35,stops[0].z);
  // Overview frames the island ground and crowns, not the waterfall or empty air.
  const corners=[];for(const t of tiles)for(const dx of [-.58,.58])for(const dz of [-.58,.58])for(const y of [-.85,t.height+1.3])corners.push(new T.Vector3(t.x+dx,y,t.z+dz));
@@ -132,11 +160,16 @@ window.Bosque={create(host,{onSelect,onError,onView=()=>{}}){
  const center=new T.Vector3(0,0,0);let angle=.55,zoom=1,lost=false,disposed=false,overview=true,exploring=false;
  const metrics={maxCalls:0,maxTriangles:0};
  const focusCenter=i=>new T.Vector3(stops[i].x*.6,0,stops[i].z*.6);
- let lift=0,spin=0;
- function place(){piece.position.copy(piecePos);piece.position.y+=lift;piece.rotation.y=angle+spin;shadow.position.set(piecePos.x,.37,piecePos.z);}
+ function goTo(u){pieceU=u;piecePos.copy(curve.getPointAt(u));piecePos.y=.35;}
+ function settle(){if(cam){center.copy(cam.to);cam=null;}if(walk){goTo(walk.to);const index=walk.index;walk=null;render();onWalk({type:'arrive',index,walked:false,moved:true,stopped:true});}}
  function stop(){cancelAnimationFrame(raf);raf=0;last=0;}
  const running=()=>!disposed&&!lost&&activeScene&&visible&&motion&&!document.hidden;
- const busy=()=>hop||cam||gesture||ambient<12;
+ const busy=()=>walk||cam||ambient<12;
+ // Screen points for the SVG layer, in CSS pixels of the canvas; unit = pixels per world unit at the current zoom.
+ const toScreen=(v,rect)=>{const p=v.clone().project(camera);return {x:(p.x+1)/2*rect.width,y:(1-p.y)/2*rect.height,z:p.z};};
+ function anchors(rect=host.getBoundingClientRect()){return {width:rect.width,height:rect.height,unit:rect.height/(camera.top-camera.bottom),rumo:toScreen(piecePos,rect),
+  guides:Object.fromEntries(Object.entries(guides).map(([n,v])=>[n,toScreen(v,rect)])),stops:stops.map(s=>toScreen(new T.Vector3(s.x,.36,s.z),rect))};}
+ const direction=(a,b)=>curve.getPointAt(b).project(camera).x>=curve.getPointAt(a).project(camera).x?1:-1;
  function schedule(){if(!manual&&!raf&&running()&&busy())raf=requestAnimationFrame(tick);}
  function view(){onView({overview,exploring,selected});}
  function render(){
@@ -146,32 +179,41 @@ window.Bosque={create(host,{onSelect,onError,onView=()=>{}}){
   const key=angle+':'+aspect;if(key!==fitKey){fitKey=key;fitHalf=0;for(const p of corners){const v=p.clone().add(center).applyMatrix4(camera.matrixWorldInverse);fitHalf=Math.max(fitHalf,Math.abs(v.y),Math.abs(v.x)/aspect);}fitHalf*=1.04;}
   const half=(overview?fitHalf:rect.width<600?2.6:3.1)/zoom;
   camera.left=-half*aspect;camera.right=half*aspect;camera.top=half;camera.bottom=-half;camera.updateProjectionMatrix();
-  place();
-  // Markers yield to the piece so its silhouette stays readable.
+  piece.position.copy(piecePos);
+  // Markers yield to Rumo so his silhouette stays readable.
   const actor=piecePos.clone();actor.y+=.6;actor.project(camera);
   for(const s of stops){const p=s.badge.getWorldPosition(new T.Vector3()).project(camera),clear=Math.abs(p.x-actor.x)>.75/(half*aspect)||Math.abs(p.y-actor.y)>.95/half;s.markers.forEach(o=>o.visible=clear&&(o!==s.lamp||states[s.index].state==='guardado'));}
-  renderer.render(scene,camera);frames++;metrics.maxCalls=Math.max(metrics.maxCalls,renderer.info.render.calls);metrics.maxTriangles=Math.max(metrics.maxTriangles,renderer.info.render.triangles);
+  syncStops();renderer.render(scene,camera);frames++;metrics.maxCalls=Math.max(metrics.maxCalls,renderer.info.render.calls);metrics.maxTriangles=Math.max(metrics.maxTriangles,renderer.info.render.triangles);
+  // The SVG layer moves only when the camera or Rumo moved.
+  const layoutKey=[center.x,center.z,angle,half,rect.width,rect.height,piecePos.x,piecePos.y,piecePos.z].join();if(layoutKey!==frameKey){frameKey=layoutKey;onFrame(anchors(rect));}
  }
  function resize(){if(disposed)return;const rect=host.getBoundingClientRect();renderer.setSize(Math.max(1,rect.width),Math.max(1,rect.height),false);fitKey='';render();}
  const ease=t=>1-Math.pow(1-t,3);
+ // Rumo walks the trail curve to the stop (Lote 5.4): crouch, run with short hops, arrive. The question is already open.
+ // Events let the bridge animate his body and the guide of the land; changing destination mid-walk starts from where he is.
  function select(index,{instant=false}={}){
-  if(!stops[index])return;const from=piecePos.clone(),to=new T.Vector3(stops[index].x,.35,stops[index].z);
+  if(!stops[index])return;
   selected=index;overview=false;ambient=0;
   stops.forEach(s=>{s.ring.scale.setScalar(s.index===index?1.15:1);});
-  const target=focusCenter(index);
-  if(instant||!motion||!running()){hop=null;cam=null;piecePos.copy(to);center.copy(target);render();view();return;}
-  hop=from.distanceTo(to)>.01?{from,to,t:0,dur:.3}:null;cam={from:center.clone(),to:target,t:0,dur:.35};schedule();render();view();
+  const target=focusCenter(index),u=STOP_U[index],du=Math.abs(u-pieceU),moved=du>1e-6;
+  if(instant||!motion||!running()){walk=null;cam=null;goTo(u);center.copy(target);render();view();onWalk({type:'arrive',index,walked:false,moved});return;}
+  // While Rumo walks, the camera waits for the crouch and eases in and out with him, so he stays in the frame (QA M1).
+  const was=!!walk;cam=moved?{from:center.clone(),to:target,t:was?0:-ANTES,dur:.29,ease:k=>k<.5?2*k*k:1-2*(1-k)*(1-k)}:{from:center.clone(),to:target,t:0,dur:.35,ease};
+  walk=moved?{from:pieceU,to:u,index,t:was?0:-ANTES,dur:runTime(du),hops:Math.max(1,Math.round(du*curve.getLength()/.8)),dir:direction(pieceU,u),running:was}:null;
+  if(walk){onWalk({type:'start',index,dir:walk.dir,antes:was?0:ANTES*1000,run:walk.dur*1000});if(was)onWalk({type:'run',index,dir:walk.dir,run:walk.dur*1000});}
+  schedule();render();view();
+  if(!walk)onWalk({type:'arrive',index,walked:false,moved:false});
  }
- function paintStops(next){states=next.map((s,i)=>({...states[i],...s}));for(const s of stops){const st=states[s.index];drawBadge(s,st);s.ring.material.color.set(st.state==='foco'?colors.sun:ZONES[st.zone]||colors.ivory);s.flag.material.color.set(st.state==='guardado'?colors.sun:ZONES[st.zone]||colors.coral);const down=st.state==='bloqueada';s.flag.position.y=down?.62:1.12;s.flag.scale.x=down?.55:1;}render();}
- function startGesture(name){gesture={name,t:0,dur:name==="celebrate"?.9:.5};ambient=0;if(!motion){gesture=null;render();return;}schedule();view();}
+ const ringColor=new T.Color(),flagColor=new T.Color();
+ function paintStops(next){states=next.map((s,i)=>({...states[i],...s}));for(const s of stops){const st=states[s.index];drawBadge(s,st);marks.ring.setColorAt(s.index,ringColor.set(st.state==='foco'?colors.sun:ZONES[st.zone]||colors.ivory));marks.flag.setColorAt(s.index,flagColor.set(st.state==='guardado'?colors.sun:ZONES[st.zone]||colors.coral));const down=st.state==='bloqueada';s.flag.position.y=down?.62:1.12;s.flag.scale.x=down?.55:1;}marks.ring.instanceColor.needsUpdate=true;marks.flag.instanceColor.needsUpdate=true;render();}
  function advance(dt){
   if(!running())return;const ambientDt=Math.min(dt,12-ambient);ambient+=ambientDt;ambientPhase+=ambientDt;wheel.rotation.x=ambientPhase*.7;stream.position.z=(ambientPhase*.18)%.65;flags.forEach((f,i)=>f.rotation.y=Math.sin(ambientPhase*2+i*1.8)*.18);
   if(reeds){for(let i=0;i<6;i++){const [x,y,z,sx,sy,sz,rx,ry,rz]=reedBase[i];dummy.position.set(x,y,z);dummy.scale.set(sx,sy,sz);dummy.rotation.set(rx,ry,rz+Math.sin(ambientPhase*1.4+i)*.08);dummy.updateMatrix();reeds.setMatrixAt(i,dummy.matrix);}reeds.instanceMatrix.needsUpdate=true;}
-  if(hop){hop.t=Math.min(hop.dur,hop.t+dt);const k=hop.t/hop.dur;piecePos.lerpVectors(hop.from,hop.to,ease(k));piecePos.y=.35+4*.55*k*(1-k);if(k>=1){piecePos.copy(hop.to);hop=null;}}
-  if(cam){cam.t=Math.min(cam.dur,cam.t+dt);center.lerpVectors(cam.from,cam.to,ease(cam.t/cam.dur));if(cam.t>=cam.dur)cam=null;}
-  if(gesture){gesture.t=Math.min(gesture.dur,gesture.t+dt);const k=gesture.t/gesture.dur,celebrate=gesture.name==='celebrate';
-   lift=celebrate?Math.abs(Math.sin(k*Math.PI*2))*.35*(1-k):0;spin=celebrate?k*Math.PI*2:Math.sin(k*Math.PI*4)*.35*(1-k);
-   if(k>=1){gesture=null;lift=0;spin=0;}}
+  if(walk){walk.t=Math.min(walk.dur,walk.t+dt);
+   if(walk.t>0){if(!walk.running){walk.running=true;onWalk({type:'run',index:walk.index,dir:walk.dir,run:walk.dur*1000});}
+    const k=walk.t/walk.dur,e=k<.5?2*k*k:1-2*(1-k)*(1-k);goTo(walk.from+(walk.to-walk.from)*e);piecePos.y+=.12*Math.abs(Math.sin(Math.PI*walk.hops*k));
+    if(k>=1){goTo(walk.to);const index=walk.index;walk=null;onWalk({type:'arrive',index,walked:true,moved:true});}}}
+  if(cam){cam.t=Math.min(cam.dur,cam.t+dt);center.lerpVectors(cam.from,cam.to,cam.ease(Math.max(0,cam.t)/cam.dur));if(cam.t>=cam.dur)cam=null;}
   render();
  }
  function tick(time){raf=0;if(!running())return;const dt=last?Math.min((time-last)/1000,.05):0;last=time;advance(dt);if(!busy())view();schedule();}
@@ -200,13 +242,15 @@ window.Bosque={create(host,{onSelect,onError,onView=()=>{}}){
  function wheelZoom(e){if(!exploring)return;e.preventDefault();zoom=T.MathUtils.clamp(zoom*Math.exp(-e.deltaY*.0015),.7,1.6);render();view();}
  canvas.addEventListener('pointerdown',down);canvas.addEventListener('pointermove',move);canvas.addEventListener('pointerup',up);canvas.addEventListener('pointercancel',e=>pointers.delete(e.pointerId));canvas.addEventListener('wheel',wheelZoom,{passive:false});
  canvas.addEventListener('webglcontextlost',e=>{e.preventDefault();lost=true;stop();onError('A visualização 3D foi interrompida. Continue pela lista de paradas.');});
- const resizeObserver=new ResizeObserver(resize);resizeObserver.observe(host);const observer=new IntersectionObserver(es=>{visible=es[0].isIntersecting;if(!visible)stop();else schedule()});observer.observe(host);const visibility=()=>{if(document.hidden)stop();else schedule()};document.addEventListener('visibilitychange',visibility);
+ // Scrolling the scene away or hiding the tab ends a walk at its stop instead of freezing it halfway (QA M4).
+ const resizeObserver=new ResizeObserver(resize);resizeObserver.observe(host);const observer=new IntersectionObserver(es=>{visible=es[0].isIntersecting;if(!visible){stop();settle();}else schedule()});observer.observe(host);const visibility=()=>{if(document.hidden){stop();settle();}else schedule()};document.addEventListener('visibilitychange',visibility);
  stops.forEach(s=>drawBadge(s,states[s.index]));resize();
- return {select,paintStops,gesture:startGesture,advance,render,camera:cameraAction,setExplore,
-  setActive(value){activeScene=value;if(value)schedule();else{stop();setExplore(false)}},
-  setMotion(value){motion=value;if(!value){stop();if(hop){piecePos.copy(hop.to);hop=null;}if(cam){center.copy(cam.to);cam=null;}gesture=null;lift=0;spin=0;render();}else schedule();},setManual(value){manual=value;stop();if(!value)schedule();},
-  state:()=>({ready:true,selected,piece:piecePos.toArray(),stopPositions:stops.map(s=>[s.x,s.z]),states:states.map(s=>s.state),hop:!!hop,cam:!!cam,gesture:gesture?.name||null,frames,active:activeScene,visible,motion,lost,tiles:tiles.length,heights:[...new Set(tiles.map(t=>t.height))],zoom,angle,center:center.toArray(),overview,exploring,ambient,metrics:{...metrics},triangles:renderer.info.render.triangles,calls:renderer.info.render.calls}),
-  raw:()=>({renderer,scene,camera,piece,stops,targets,curve,trail,wheel,stream,flags}),
+ return {select,paintStops,advance,render,anchors,camera:cameraAction,setExplore,
+  // Leaving the view or pausing ends the walk at its stop: it never resumes later in the middle of something else.
+  setActive(value){activeScene=value;if(value)schedule();else{stop();setExplore(false);settle();}},
+  setMotion(value){motion=value;if(!value){stop();settle();render();}else schedule();},setManual(value){manual=value;stop();if(!value)schedule();},
+  state:()=>({ready:true,selected,piece:piecePos.toArray(),stopPositions:stops.map(s=>[s.x,s.z]),states:states.map(s=>s.state),hop:!!walk,cam:!!cam,frames,active:activeScene,visible,motion,lost,tiles:tiles.length,heights:[...new Set(tiles.map(t=>t.height))],zoom,angle,center:center.toArray(),overview,exploring,ambient,metrics:{...metrics},triangles:renderer.info.render.triangles,calls:renderer.info.render.calls}),
+  raw:()=>({renderer,scene,camera,piece,stops,targets,curve,trail,wheel,stream,flags,guides}),
   dispose(){disposed=true;stop();resizeObserver.disconnect();observer.disconnect();document.removeEventListener('visibilitychange',visibility);release(scene);renderer.dispose();canvas.remove();}
  };
 }};
