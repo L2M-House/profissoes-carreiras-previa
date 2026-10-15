@@ -130,8 +130,10 @@ function nodeEffects(b,i,prev,state){
 function think(){const fig=figureOf(STEP_COMPANIONS[lab.step]);if(!fig||fig.dataset.state!=='welcome'||mapRuns.get(fig.dataset.character)?.some(a=>a.playState==='running'))return;fig.dataset.state='thinking';later(()=>{if(fig.dataset.state==='thinking')fig.dataset.state='welcome';},FX.pensar,fig.dataset.character);}
 function paintWorld(){
  const d=worldDomain(),done=d.recorded&&!lab.started,focus=done?6:lab.step,stop=STOPS[focus];
- $('world-place-zone').textContent=`${stop.mark.id} · ${stop.mark.deg} · ${stop.place}`;
- $('world-place-state').textContent=done?'Exercício guardado':`Parada ${focus+1} de 7 · ${STATE_TEXT[shownState(d.steps[focus])]}`;
+ // Lote 5.5: a linha cabe ao lado do botão de alternativa; o grau sai no celular e "Você está aqui" já está na fila.
+ const focusState=shownState(d.steps[focus]);
+ $('world-place-zone').innerHTML=`${stop.mark.id} · <span class="place-deg">${stop.mark.deg} · </span>${stop.place}`;
+ $('world-place-state').innerHTML=done?'Exercício guardado':`Parada ${focus+1}&nbsp;de&nbsp;7`+(focusState==='foco'?'':`<span class="place-state"> · ${STATE_TEXT[focusState]}</span>`);
  $('world-question').hidden=done;$('world-done').hidden=!done;$('world-example').hidden=done;
  // Update the stop buttons in place: rebuilding them on a field's blur would swallow the click that caused it.
  const list=$('world-nodes');
@@ -163,6 +165,7 @@ function placeLab(inWorld){
  const form=$('experiment-form');
  if(inWorld&&!worldOwnsForm()){$('world-question').append(form);form.hidden=false;startLabInWorld();}
  if(!inWorld&&worldOwnsForm()){
+  form.querySelector('.experiment-actions #lab-skip')?.remove();// a página do laboratório recria o botão no fim da pergunta
   LAB_HOME[0].insertBefore(form,LAB_HOME[1]);$('experiment-back').hidden=false;
   if(worldAutoStart&&!Object.keys(lab.data).length){lab.started=false;worldAutoStart=false;}
   if(current==='experimento')renderExperiment();
@@ -178,7 +181,7 @@ function syncWorld(){
  if(worldFailed)return;
  if(!worldView){
   if(worldLoading)return;worldLoading=true;
-  const script=document.createElement('script');script.src='media/world/bosque.bundle.js?v=6';
+  const script=document.createElement('script');script.src='media/world/bosque.bundle.js?v=7';
   script.onerror=()=>worldFallback('Não foi possível abrir o 3D. As paradas e as perguntas continuam disponíveis.');
   script.onload=()=>{try{buildMapLayer();worldView=Bosque.create($('world-viewport'),{onSelect:goStop,onError:worldFallback,onView:paintWorldCamera,onFrame:layoutMap,onWalk:onRumoWalk});window.mapWorld=worldView;$('world-viewport').dataset.ready='true';paintWorld();const done=worldDomain().recorded&&!lab.started;mapQuiet=true;worldView.select(done?6:lab.step,{instant:true});mapQuiet=false;if(done)worldView.camera('center');syncWorld();}catch{worldFallback('Seu navegador não abriu o 3D. Use a lista de paradas.');}};
   document.head.append(script);return;
@@ -189,11 +192,16 @@ function syncWorld(){
 window.refreshWorld=syncWorld;
 function paintWorldCamera(state){
  $('world-overview').textContent=state.overview?'Voltar à parada':'Ver bosque';
- $('world-explore').setAttribute('aria-pressed',String(!!state.exploring));$('world-explore').textContent=state.exploring?'Sair da exploração':'Explorar mapa';
- const hint='Exploração livre: arraste em qualquer direção e use dois dedos para aproximar. Toque em Sair da exploração para voltar à rolagem da página.';
+ $('world-explore').setAttribute('aria-pressed',String(!!state.exploring));$('world-explore').innerHTML=state.exploring?'Sair<span class="cam-extra"> da exploração</span>':'Explorar<span class="cam-extra"> mapa</span>';
+ const hint='Exploração livre: arraste em qualquer direção e use dois dedos para aproximar. Toque em Sair quando terminar.';
  if(worldFailed)return;if(state.exploring)setWorldStatus(hint);else if($('world-status').textContent===hint)setWorldStatus('');
 }
-window.addEventListener('lab:step',()=>{if(!worldOwnsForm())return;$('experiment-back').hidden=lab.step===0;paintWorld();thoughtStep=-1;mapQuiet=worldEntering;worldView?.select(lab.step,{instant:worldEntering});mapQuiet=false;});
+window.addEventListener('lab:step',()=>{if(!worldOwnsForm())return;$('experiment-back').hidden=lab.step===0;
+ // Lote 5.5: Voltar, Deixar para depois e Continuar ficam presos no rodapé do bloco; a pergunta nova começa do topo.
+ const next=$('experiment-next'),skip=$('experiment-fields').querySelector('#lab-skip');next.parentElement.querySelector('#lab-skip')?.remove();
+ if(skip){skip.textContent='Deixar para depois';next.before(skip);}
+ $('experiment-back').innerHTML=icon('back')+'<span class="back-label">Voltar</span>';$('experiment-fields').scrollTop=0;
+ paintWorld();thoughtStep=-1;mapQuiet=worldEntering;worldView?.select(lab.step,{instant:worldEntering});mapQuiet=false;});
 // On document, so experiment.js has already collected the field when the map repaints.
 document.addEventListener('input',e=>{if(worldOwnsForm()&&e.target.closest('#experiment-form')){worldAutoStart=false;paintWorld();
  // Pessoa digitando: o guia da terra faz a pose de pensar uma vez por parada.
@@ -206,5 +214,26 @@ $('world-camera').querySelector('.world-adjust').onclick=e=>{const button=e.targ
 $('world-example').onclick=()=>{worldAutoStart=false;$('experiment-example').click();};
 $('world-restart').onclick=()=>{lab={owner:owner(),programa,step:0,data:{},started:true};labSaved=false;worldAutoStart=true;renderLabStep(0);focusLab();};
 window.addEventListener('mapa:saved',e=>{if(e.detail?.programa==='filho')worldCelebrationPending=e.detail;});
+// QA A1: as ações ficam no mesmo lugar ao trocar de pergunta. O segundo clique de um duplo clique (ou toque duplo), que o
+// navegador marca com detail > 1, não avança de novo nem grava a revisão sem que ela apareça.
+$('experiment-form').addEventListener('click',e=>{if(worldOwnsForm()&&e.detail>1&&e.target.closest('#experiment-next,#lab-skip,#experiment-back')){e.preventDefault();e.stopImmediatePropagation();}},true);
+// Lote 5.5: o bosque ocupa uma tela na rota do Filho. --top-h é o cabeçalho preso no desktop (0 no celular, onde ele rola).
+const topBar=document.querySelector('.top');
+function measureTop(){const h=getComputedStyle(topBar).position==='sticky'?topBar.offsetHeight:0;document.documentElement.style.setProperty('--top-h',h+'px');return h;}
+measureTop();addEventListener('resize',measureTop);
+// Ao entrar na rota a página para no bloco. offsetTop ignora o transform da entrada da página, que deslocaria o bloco 10 px.
+window.scrollToWorld=()=>{let y=0;for(let e=$('world-stage');e;e=e.offsetParent)y+=e.offsetTop;window.scrollTo({top:y-measureTop(),behavior:'instant'});};
+// Celular em pé: com um campo de texto em foco, o mapa recolhe para a fila de paradas (CSS) e volta ao sair do campo.
+// Saindo por um toque, espera o toque terminar: a fila desce quando o mapa volta, e o clique tem de cair onde a pessoa tocou.
+const typingField=e=>!!e?.matches?.('#world-stage #experiment-fields :is(textarea,input:not([type=radio]):not([type=checkbox]))');
+let pressing=false;
+const syncTyping=()=>$('world-stage').toggleAttribute('data-typing',typingField(document.activeElement));
+function afterPress(fn){const go=()=>{removeEventListener('pointerup',go,true);removeEventListener('pointercancel',go,true);setTimeout(fn);};addEventListener('pointerup',go,true);addEventListener('pointercancel',go,true);}
+addEventListener('pointerdown',()=>{pressing=true;},true);addEventListener('pointerup',()=>{pressing=false;},true);addEventListener('pointercancel',()=>{pressing=false;},true);
+const portrait=matchMedia('(max-width:899px) and (orientation:portrait)');
+// O campo sobe para o alto da área da pergunta, acima de onde o teclado abre. Só a área interna rola, nunca a página.
+document.addEventListener('focusin',e=>{if(!typingField(e.target))return;syncTyping();
+ if(portrait.matches){const f=$('experiment-fields'),box=(e.target.closest('label')||e.target).getBoundingClientRect();f.scrollTop+=box.top-f.getBoundingClientRect().top-8;}});
+document.addEventListener('focusout',e=>{if(!typingField(e.target))return;if(pressing)afterPress(syncTyping);else setTimeout(syncTyping);});
 reduce.addEventListener('change',syncWorld);
 new MutationObserver(syncWorld).observe(document.body,{attributes:true,attributeFilter:['data-motion','data-view']});

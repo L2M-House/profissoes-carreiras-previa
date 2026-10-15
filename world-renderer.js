@@ -156,7 +156,7 @@ window.Bosque={create(host,{onSelect,onError,onView=()=>{},onFrame=()=>{},onWalk
  const piecePos=new T.Vector3(stops[0].x,.35,stops[0].z);
  // Overview frames the island ground and crowns, not the waterfall or empty air.
  const corners=[];for(const t of tiles)for(const dx of [-.58,.58])for(const dz of [-.58,.58])for(const y of [-.85,t.height+1.3])corners.push(new T.Vector3(t.x+dx,y,t.z+dz));
- let fitKey='',fitHalf=5;
+ let fitKey='',fitHalf=5,fitWide=5;
  const center=new T.Vector3(0,0,0);let angle=.55,zoom=1,lost=false,disposed=false,overview=true,exploring=false;
  const metrics={maxCalls:0,maxTriangles:0};
  const focusCenter=i=>new T.Vector3(stops[i].x*.6,0,stops[i].z*.6);
@@ -176,8 +176,11 @@ window.Bosque={create(host,{onSelect,onError,onView=()=>{},onFrame=()=>{},onWalk
   if(lost||disposed)return;
   const rect=host.getBoundingClientRect(),aspect=Math.max(.2,rect.width/Math.max(1,rect.height));
   camera.position.set(center.x+Math.sin(angle)*10,10,center.z+Math.cos(angle)*10);camera.lookAt(center.x,.45,center.z);camera.updateMatrixWorld();
-  const key=angle+':'+aspect;if(key!==fitKey){fitKey=key;fitHalf=0;for(const p of corners){const v=p.clone().add(center).applyMatrix4(camera.matrixWorldInverse);fitHalf=Math.max(fitHalf,Math.abs(v.y),Math.abs(v.x)/aspect);}fitHalf*=1.04;}
-  const half=(overview?fitHalf:rect.width<600?2.6:3.1)/zoom;
+  const key=angle+':'+aspect;if(key!==fitKey){fitKey=key;fitHalf=0;fitWide=0;for(const p of corners){const v=p.clone().add(center).applyMatrix4(camera.matrixWorldInverse);fitHalf=Math.max(fitHalf,Math.abs(v.y),Math.abs(v.x)/aspect);fitWide=Math.max(fitWide,Math.abs(v.x));}fitHalf*=1.04;}
+  // Lote 5.5 (B12): numa faixa larga o foco aproxima até a ilha ocupar mais da largura, sem passar de 2,6 (a Pipa voa no
+  // alto e sairia do quadro); numa faixa baixa em pé, até o Rumo ter 56 px (altura/90), sem passar de 1,9. Deitado, a faixa
+  // é tão baixa que o piso é 2,4, para os guias não se cobrirem. Medido contra o cenário "guias em chão livre" do 5.4.
+  const half=(overview?fitHalf:Math.min(rect.width<600?2.6:3.1,Math.max(2.6,fitWide*.9/aspect),Math.max(aspect<2.5?1.9:2.4,rect.height/90)))/zoom;
   camera.left=-half*aspect;camera.right=half*aspect;camera.top=half;camera.bottom=-half;camera.updateProjectionMatrix();
   piece.position.copy(piecePos);
   // Markers yield to Rumo so his silhouette stays readable.
