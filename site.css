@@ -253,3 +253,126 @@ html:has(#bosque:not([hidden])){scroll-padding-top:var(--top-h,78px)}
 #world-stage .review-section{align-content:start}
 /* Sem WebGL o pôster cobre a faixa inteira, como o 3D: corta as pontas da floresta em vez de deixar faixas creme (QA M3). */
 #world-stage #world-poster{object-fit:cover;padding:0}
+/* Lote 5.7: fase por fase. O formulário continua inteiro; os blocos dos outros passos ficam com data-off. O passo 1 mostra a
+   dica da pergunta; os opcionais trocam a dica por uma frase que diz para que servem. */
+#world-stage #experiment-fields [data-off]{display:none}
+#world-stage .compare-column:not(:has(label:not([data-off]))){display:none}
+#world-stage #experiment-fields:not([data-part="0"]) .step-hint{display:none}
+#world-stage .part-why{margin:0;font-size:15px;line-height:1.45;color:var(--muted)}
+#world-stage .part-why:empty{display:none}
+#world-stage .part-why:focus{outline:none}
+/* Barra de passos da fase, no topo do painel: um traço por passo, cheio até o atual, e o texto "Passo 2 de 3". */
+#world-stage .world-place-state{display:flex;flex-wrap:wrap;align-items:center;gap:0 8px}
+#world-stage .part-bar{display:inline-flex;gap:4px}
+#world-stage .part-bar i{width:20px;height:6px;border-radius:99px;background:var(--line-deep)}
+#world-stage .part-bar i[data-on]{background:var(--ink)}
+#world-stage .part-text{font-weight:800;color:var(--ink)}
+/* Passagem de fase: o painel desce e some em 200 ms enquanto o mapa cresce (o JS anima a altura, ou a largura deitado); na
+   volta, sobe. data-instant tira as transições quando um toque pula a passagem. */
+#world-stage :is(.world-place-head,.companion-stage,.world-status,#experiment-fields,#experiment-status,.experiment-actions,.world-note){transition:opacity .2s cubic-bezier(.2,.8,.2,1),transform .2s cubic-bezier(.2,.8,.2,1)}
+#world-stage::before,#world-stage .world-camera,.passage-note{transition:opacity .2s}
+#world-stage[data-passage]:not([data-closing]) :is(.world-place-head,.companion-stage,.world-status,#experiment-fields,#experiment-status,.experiment-actions,.world-note){opacity:0;transform:translateY(24px);pointer-events:none}
+#world-stage[data-passage]:not([data-closing])::before{opacity:0}
+#world-stage[data-passage] .world-camera{opacity:0;pointer-events:none}
+#world-stage[data-passage=wide] .world-scene{grid-column:1/-1;justify-self:start;z-index:2}
+#world-stage[data-instant] *,#world-stage[data-instant]::before{transition:none!important}
+.passage-note{position:absolute;left:50%;top:12px;z-index:1;margin:0;padding:6px 16px;border:2px solid var(--ink);border-radius:999px;background:var(--white);font-size:15px;font-weight:900;white-space:nowrap;transform:translateX(-50%);opacity:0;pointer-events:none}
+#world-stage[data-passage]:not([data-closing]) .passage-note{opacity:1}
+/* Passo compacto (opção A, escolhida por Marcelo em 15/10): sem a linha "01 / ...", escolhas em duas colunas só com o título
+   (a descrição da atividade marcada aparece numa linha abaixo) e revisão com título, estado e Editar por bloco. */
+.help-short{display:none}
+#world-stage[data-phase] #experiment-fields>.eyebrow{display:none}
+/* As descrições das atividades saem da tela, mas continuam para o leitor de tela (QA O3). */
+#world-stage[data-phase] .choice small{position:absolute;width:1px;height:1px;margin:-1px;overflow:hidden;clip-path:inset(50%);white-space:nowrap}
+#world-stage .choice-note{margin:8px 0 0;font-size:14px;line-height:1.4;color:var(--muted)}
+#world-stage .choice-note:empty{display:none}
+#world-stage[data-phase] .review-section{position:relative;display:block;padding:10px 12px}
+#world-stage[data-phase] .review-section>p{display:none}
+#world-stage[data-phase] .review-section h2{margin:0 0 2px;font-size:14px}
+#world-stage .review-state{display:block;font-size:14px;color:var(--muted)}
+/* O botão Editar cobre o bloco inteiro (alvo grande); o rótulo fica no canto de baixo, na linha do estado. */
+#world-stage[data-phase] .review-section button{position:absolute;inset:0;width:100%;height:100%;min-height:44px;display:flex;align-items:flex-end;justify-content:flex-end;padding:10px 12px;border:0;border-radius:inherit;background:none;box-shadow:none;font-size:14px;text-decoration:underline;text-underline-offset:3px}
+#world-stage[data-phase] .review-section:has(button:hover){background:var(--cream)}
+@media(max-width:899px){#world-stage[data-phase] :is(.choice-grid,.lab-review){grid-template-columns:repeat(2,minmax(0,1fr))}}
+/* Campos de texto com duas linhas à vista (crescem ao arrastar o canto); as fichas da comparação perdem a moldura, e nos
+   passos opcionais o nome da possibilidade vem na frase de cima, no lugar do título "Possibilidade A". */
+#world-stage[data-phase] textarea{min-height:0;height:58px;padding:6px 12px;line-height:1.35}
+#world-stage[data-phase] #experiment-fields{padding-bottom:6px}
+#world-stage[data-phase] .compare-grid{gap:0 24px;margin-top:12px}
+#world-stage[data-phase] .compare-column{padding:0;border:0;background:none}
+#world-stage[data-phase] .compare-column h2{font-size:15px;color:var(--muted)}
+#world-stage[data-phase] #experiment-fields:not([data-part="0"]) .compare-column h2{display:none}
+#world-stage[data-phase] .compare-column label:first-of-type{margin-top:4px}
+/* Nos passos opcionais a frase de para que servem fica no lugar do título, que segue para o leitor de tela, e o "(opcional)"
+   de cada rótulo sai, porque a frase já diz. */
+#world-stage[data-phase] #experiment-fields:not([data-part="0"])>h1{position:absolute;width:1px;height:1px;margin:-1px;overflow:hidden;clip-path:inset(50%);white-space:nowrap}
+#world-stage[data-phase] #experiment-fields:not([data-part="0"]) label small{display:none}
+#world-stage[data-phase] #experiment-fields:not([data-part="0"]) .part-why{font-size:17px;font-weight:800;line-height:1.35;color:var(--ink)}
+/* Atividades e prioridades: o título já pergunta, então a legenda fica só para o leitor de tela; contador e descrição da
+   opção marcada dividem uma linha. */
+#world-stage[data-phase] fieldset:has([name=activities],[name=values],[name=action])>legend{position:absolute;width:1px;height:1px;margin:-1px;overflow:hidden;clip-path:inset(50%);white-space:nowrap}
+#world-stage[data-phase] .value-counter{display:inline-block}
+#world-stage[data-phase] .choice-note{display:inline}
+#world-stage[data-phase] .choice-note:not(:empty)::before{content:" · "}
+#world-stage[data-phase] .choice{padding:6px 10px;gap:8px;align-items:center}
+#world-stage[data-phase] .choice strong{font-size:14px;line-height:1.25}
+/* Mapa curto enquanto a fase está aberta; na passagem ele ocupa a área (JS). */
+@media(max-width:599px) and (orientation:portrait){#world-stage[data-phase]:not([data-mapa]) .world-viewport{height:clamp(116px,14svh,156px)}
+ /* Na faixa curta só "Ver bosque", que abre o mapa do tamanho do 5.6 com Explorar e Ajustar. */
+ #world-stage[data-phase]:not([data-mapa]) :is(#world-explore,.world-adjust){display:none}}
+@media(max-width:599px){
+ #world-stage[data-phase] .choice{padding:6px 8px;gap:6px}
+ #world-stage[data-phase] #experiment-fields{padding-left:12px;padding-right:12px}
+ #world-stage[data-phase] #experiment-fields h1{margin-top:0}
+ /* Celular em pé: a linha do exemplo fictício fica na primeira parada, onde se começa; o aviso completo segue acima do bloco. */
+ #world-stage[data-phase]:not([data-stop="0"]) .world-note{display:none}
+ #world-stage[data-phase] .choice input{width:18px;height:18px}
+ #world-stage[data-phase] .review-section{padding:10px}
+ #world-stage[data-phase] .review-section h2{letter-spacing:-.01em}
+}
+@media(min-width:600px) and (max-width:899px) and (orientation:portrait){#world-stage[data-phase]:not([data-mapa]) .world-viewport{height:20svh}}
+@media(min-width:900px){#world-stage[data-phase]:not([data-mapa]) .world-viewport{height:26svh}}
+/* Tela larga: os campos soltos de um passo dividem a linha (até três), o título fica à esquerda e a dica à direita. */
+@media(min-width:900px){
+ #world-stage[data-phase] #experiment-fields{grid-template-columns:repeat(6,minmax(0,200px));align-items:start}
+ #world-stage[data-phase] #experiment-fields>h1{grid-area:1/1/2/4}
+ #world-stage[data-phase] #experiment-fields>.step-hint{grid-area:1/4/2/7}
+ #world-stage[data-phase] #experiment-fields>.part-why{grid-column:1/-1}
+ #world-stage[data-phase] #experiment-fields>:is(fieldset,label,div){grid-column:1/-1;max-width:none}
+ #world-stage[data-phase] #experiment-fields[data-cols="2"]>:is(label,div:not(.compare-grid)){grid-column:span 3}
+ #world-stage[data-phase] #experiment-fields[data-cols="3"]>:is(label,div:not(.compare-grid)){grid-column:span 2}
+}
+/* Deitado: mapa com 42% da largura (a fila das sete paradas cabe inteira), a barra de passos no topo da pergunta, os campos
+   lado a lado como na tela larga e o botão de ajuda com o rótulo curto. Na passagem o mapa enche a altura do cartão. */
+@media(max-height:640px) and (min-aspect-ratio:4/3){
+ #world-stage[data-phase]{grid-template-columns:minmax(0,42fr) minmax(0,58fr);grid-template-rows:auto auto minmax(120px,1fr) auto auto;grid-template-areas:"scene head" "scene status" "scene fields" "scene labstatus" "scene actions"}
+ #world-stage[data-phase] .world-viewport{height:auto}
+ #world-stage[data-phase] .world-place-head{display:flex;margin:6px 12px 0 16px}
+ #world-stage .help-long{display:none}
+ #world-stage .help-short{display:inline}
+ #world-stage[data-passage=wide] .world-scene{margin-bottom:0;padding-bottom:0}
+ #world-stage[data-phase] #experiment-fields:not([data-part="0"]) .part-why{font-size:15px}
+ #world-stage[data-phase] #experiment-fields{display:grid;grid-template-columns:repeat(6,minmax(0,1fr));column-gap:16px;align-content:start;align-items:start;padding:2px 16px 8px}
+ #world-stage[data-phase] #experiment-fields>*{grid-column:1/-1}
+ #world-stage[data-phase] #experiment-fields[data-cols="2"]>:is(label,div:not(.compare-grid)){grid-column:span 3}
+ #world-stage[data-phase] #experiment-fields[data-cols="3"]>:is(label,div:not(.compare-grid)){grid-column:span 2}
+ #world-stage[data-phase] .choice-grid{grid-template-columns:repeat(3,minmax(0,1fr))}
+ /* Os oito botões de ajuste em duas linhas de quatro, dentro da coluna do mapa. */
+ #world-stage[data-phase] .world-adjust-buttons{grid-template-columns:repeat(4,44px)}
+ #world-stage[data-phase] .lab-review{grid-template-columns:repeat(3,minmax(0,1fr))}
+}
+@media(min-width:900px),(max-height:640px) and (min-aspect-ratio:4/3){
+ /* Campos na mesma linha começam juntos, logo abaixo da dica. */
+ #world-stage[data-phase] #experiment-fields:is([data-cols="2"],[data-cols="3"])>:is(label,div:not(.compare-grid)){margin-top:12px}
+ #world-stage[data-phase] .compare-column{display:grid;grid-template-columns:repeat(var(--n,1),minmax(0,1fr));column-gap:24px;align-items:start}
+ #world-stage[data-phase] .compare-column>h2{grid-column:1/-1}
+ #world-stage[data-phase] #experiment-fields:not([data-part="0"]) .compare-grid{grid-template-columns:1fr}
+}
+@media(max-width:599px){#world-stage .help-long{display:none}#world-stage .help-short{display:inline}}
+/* Mensagens da pergunta (rascunho, exemplo, erro, fase concluída): uma faixa sobre a base da área da pergunta, logo acima das
+   ações, sem empurrar o passo (QA M1). O que não é erro sai sozinho em 2,5 s, depois de anunciado (world-bridge.js). */
+#world-stage[data-phase]{position:relative}
+#world-stage[data-phase] #experiment-status{position:absolute;left:12px;right:12px;bottom:4px;z-index:1;margin:0;padding:6px 12px;border:2px solid var(--line);border-radius:12px;background:var(--cream);box-shadow:0 2px 0 var(--line-deep)}
+#world-stage[data-phase] #experiment-status:empty{display:none}
+@media(max-width:599px){#world-stage #part-skip{min-height:44px;padding:4px 10px;line-height:1.15}}
+@media(max-height:640px) and (min-aspect-ratio:4/3){#world-stage #part-skip{padding:4px 10px;line-height:1.15}}

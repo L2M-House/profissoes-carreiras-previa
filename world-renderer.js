@@ -200,7 +200,7 @@ window.Bosque={create(host,{onSelect,onError,onView=()=>{},onFrame=()=>{},onWalk
  let selected=0,activeScene=false,visible=true,motion=true,manual=false,raf=0,last=0,frames=0,ambient=12,ambientPhase=0,states=stops.map(()=>({state:'disponível',zone:'leaf'}));
  let walk=null,cam=null,aim=null,pieceU=STOP_U[0],frameKey='';
  const piecePos=new T.Vector3(stops[0].x,.35,stops[0].z);
- const center=new T.Vector3(0,0,0);let angle=A0,zoom=1,lost=false,disposed=false,overview=true,exploring=false,framed=true,insetBottom=0;
+ const center=new T.Vector3(0,0,0);let angle=A0,zoom=1,lost=false,disposed=false,overview=true,exploring=false,framed=true,insetBottom=0,compact=false,shortNow=false;
  const metrics={maxCalls:0,maxTriangles:0};
  function goTo(u){pieceU=u;piecePos.copy(curve.getPointAt(u));piecePos.y=.35;}
  // Camera basis at the current angle: screen right (horizontal), screen up, and toward the camera on the ground. The camera
@@ -229,20 +229,23 @@ window.Bosque={create(host,{onSelect,onError,onView=()=>{},onFrame=()=>{},onWalk
  // Phones in portrait keep Rumo between 56 and 72 px (Lote 5.4); elsewhere the drawing stops at 130 px. A strip under 200 px
  // (portrait with 601 to 700 px of window) cannot hold 56 px with the guide above and the buttons below: there the frame
  // fits stop, guide and Rumo above the buttons and Rumo gets smaller (QA A1).
- function bounds(){const r=rectOf();return r.width<600&&r.height>=170?{lo:r.height/116,hi:r.height>=200?r.height/91:9}:{lo:Math.max(1.6,r.height*FIGURE_UNITS/260),hi:9};}
+ // Lote 5.7: the short map of an open phase (the bridge sets compact; it applies under 170 px) holds Rumo and the stop at 30 to 84 px per unit,
+ // so no drawing drops to the 46 px floor, where Rumo and the guide above him overlap. The frame stays on Rumo and the stop (the
+ // guides stand above its top edge there); the bridge hides a guide that is not whole in the frame.
+ function bounds(){const r=rectOf();shortNow=compact&&r.height<170;if(shortNow)return {lo:r.height/168,hi:r.height/60};return r.width<600&&r.height>=170?{lo:r.height/116,hi:r.height>=200?r.height/91:9}:{lo:Math.max(1.6,r.height*FIGURE_UNITS/260),hi:9};}
  const rumoAt=i=>new T.Vector3(stops[i].x,.35,stops[i].z);
- function focusBoxes(i,unit,neighbours){const g=LAND_GUIDE[i],bs=[figureBox(rumoAt(i),unit),...stopBoxes(i)];if(g)bs.push(figureBox(guides[g],unit));if(neighbours)for(const j of [i-1,i+1])if(stops[j])bs.push(stopBoxes(j)[0]);return bs;}
+ function focusBoxes(i,unit,neighbours){const g=shortNow?null:LAND_GUIDE[i],bs=[figureBox(rumoAt(i),unit),...stopBoxes(i)];if(g)bs.push(figureBox(guides[g],unit));if(neighbours)for(const j of [i-1,i+1])if(stops[j])bs.push(stopBoxes(j)[0]);return bs;}
  // One zoom for the seven stops (the frame does not breathe between them): the largest that fits each stop with its guide.
  function frameFocus(i){basis();const {lo,hi}=bounds();let half=lo;for(let j=0;j<7;j++)half=Math.max(half,fit(u=>focusBoxes(j,u,false),lo,hi).half);
   const wide=fit(u=>focusBoxes(i,u,true),half,half),near=wide.need<=half*1.001;let f=near?wide:fit(u=>focusBoxes(i,u,false),half,half);
   // A guide of another land whose middle falls in the frame comes in whole, when it fits: at Bifurcação on a wide screen the
   // frame shows all three, and none may lose the head at the top edge (QA M2).
-  const r=rectOf(),w=half*r.width/r.height,extra=Object.entries(guides).filter(([n,g])=>n!==LAND_GUIDE[i]&&Math.abs(sx(g)-f.cx)<w).map(([,g])=>g);
+  const r=rectOf(),w=half*r.width/r.height,extra=Object.entries(guides).filter(([n,g])=>!shortNow&&n!==LAND_GUIDE[i]&&Math.abs(sx(g)-f.cx)<w).map(([,g])=>g);
   if(extra.length){const e=fit(u=>[...focusBoxes(i,u,near),...extra.map(g=>figureBox(g,u))],half,half,2);if(e.need<=half*1.001)f=e;}
   // No character cut by a side edge either: the frame slides sideways, as little as it can and keeping Rumo, the stop and
   // the guide of the land inside, until each other guide is either whole in the frame or out of it.
   const unit=r.height/(2*half),pad=4/unit,req=focusBoxes(i,unit,false),lo2=Math.max(...req.map(b=>b[1]))+pad-w,hi2=Math.min(...req.map(b=>b[0]))-pad+w,top=f.cy+half-pad,bottom=f.cy-half+insetBottom/unit+pad;
-  const others=Object.entries(guides).filter(([n])=>n!==LAND_GUIDE[i]).map(([,g])=>figureBox(g,unit)).filter(([,,y0,y1])=>y1>f.cy-half&&y0<f.cy+half);
+  const others=Object.entries(guides).filter(([n])=>!shortNow&&n!==LAND_GUIDE[i]).map(([,g])=>figureBox(g,unit)).filter(([,,y0,y1])=>y1>f.cy-half&&y0<f.cy+half);
   const clear=cx=>others.every(([x0,x1,y0,y1])=>x1<=cx-w||x0>=cx+w||x0>=cx-w+pad&&x1<=cx+w-pad&&y0>=bottom&&y1<=top);
   const tries=[f.cx,...others.flatMap(([x0,x1])=>[x0-w,x1+w,x1+pad-w,x0-pad+w])].filter(cx=>cx>=lo2-1e-6&&cx<=hi2+1e-6&&clear(cx)).sort((a,b)=>Math.abs(a-f.cx)-Math.abs(b-f.cx));
   return {center:centerAt(tries.length?tries[0]:f.cx,f.cy),half};}
@@ -351,10 +354,12 @@ window.Bosque={create(host,{onSelect,onError,onView=()=>{},onFrame=()=>{},onWalk
  return {select,paintStops,advance,render,anchors,camera:cameraAction,setExplore,
   // The camera controls drawn over the bottom of the strip (px): the frame keeps stops and characters above them.
   setInsets({bottom=0}={}){if(Math.abs(bottom-insetBottom)<1)return;insetBottom=bottom;reframe();render();},
+  // Lote 5.7: the bridge marks an open phase; under 170 px the focus then frames Rumo and the stop (see bounds).
+  setCompact(value){if(compact===!!value)return;compact=!!value;reframe();render();},
   // Leaving the view or pausing ends the walk at its stop: it never resumes later in the middle of something else.
   setActive(value){activeScene=value;if(value)schedule();else{stop();setExplore(false);settle();}},
   setMotion(value){motion=value;if(!value){stop();settle();render();}else schedule();},setManual(value){manual=value;stop();if(!value)schedule();},
-  state:()=>({ready:true,selected,piece:piecePos.toArray(),stopPositions:stops.map(s=>[s.x,s.z]),states:states.map(s=>s.state),hop:!!walk,cam:!!cam,frames,active:activeScene,visible,motion,lost,tiles:tiles.length,heights:[...new Set(tiles.map(t=>t.height))],zoom,angle,center:center.toArray(),overview,exploring,ambient,metrics:{...metrics},triangles:renderer.info.render.triangles,calls:renderer.info.render.calls}),
+  state:()=>({ready:true,compact,short:shortNow,selected,piece:piecePos.toArray(),stopPositions:stops.map(s=>[s.x,s.z]),states:states.map(s=>s.state),hop:!!walk,cam:!!cam,frames,active:activeScene,visible,motion,lost,tiles:tiles.length,heights:[...new Set(tiles.map(t=>t.height))],zoom,angle,center:center.toArray(),overview,exploring,ambient,metrics:{...metrics},triangles:renderer.info.render.triangles,calls:renderer.info.render.calls}),
   raw:()=>({renderer,scene,camera,piece,stops,targets,curve,trail,wheel,stream,flags,guides,landmarks,millBox,field:FIELD,toTrail:ST}),
   dispose(){disposed=true;stop();resizeObserver.disconnect();observer.disconnect();document.removeEventListener('visibilitychange',visibility);release(scene);renderer.dispose();canvas.remove();}
  };
