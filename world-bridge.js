@@ -170,7 +170,8 @@ function paintWorld(){
 }
 function setWorldStatus(text){$('world-status').textContent=text;}
 function goStop(i){
- const d=worldDomain(),s=d.steps[i];if(!s)return;finishPassage();closeMap();setWorldStatus(worldFailed||'');tapRing(i);
+ const d=worldDomain(),s=d.steps[i];if(!s)return;finishPassage();closeMap();worldView?.gust(i);// Lote 5.9: o vento sopra na parada tocada
+ setWorldStatus(worldFailed||'');tapRing(i);
  if(d.recorded&&!lab.started){worldView?.select(i);return;}
  if(!s.available){setWorldStatus(`${STOPS[i].name} abre depois de ${STOPS[i-1].name}. Responda a pergunta anterior ou deixe-a para depois.`);return;}
  worldAutoStart=false;
@@ -205,7 +206,7 @@ function syncWorld(){
  if(worldFailed)return;
  if(!worldView){
   if(worldLoading)return;worldLoading=true;
-  const script=document.createElement('script');script.src='media/world/bosque.bundle.js?v=13';
+  const script=document.createElement('script');script.src='media/world/bosque.bundle.js?v=14';
   script.onerror=()=>worldFallback('Não foi possível abrir o 3D. As paradas e as perguntas continuam disponíveis.');
   script.onload=()=>{try{buildMapLayer();worldView=Bosque.create($('world-viewport'),{onSelect:goStop,onError:worldFallback,onView:paintWorldCamera,onFrame:layoutMap,onWalk:onRumoWalk});window.mapWorld=worldView;measureInsets();$('world-viewport').dataset.ready='true';paintWorld();const done=worldDomain().recorded&&!lab.started;mapQuiet=true;worldView.select(done?6:lab.step,{instant:true});mapQuiet=false;if(done)worldView.camera('center');syncWorld();if(!done)worldView.intro();}catch{worldFallback('Seu navegador não abriu o 3D. Use a lista de paradas.');}};
   document.head.append(script);return;
@@ -310,7 +311,8 @@ function passPhase(from){
  note.textContent=`Fase ${from+1} concluída`;$('world-live').textContent=`Fase ${from+1} concluída.`;
  passage={from,to,timers:[],...growMap(FX.abre)};
  // Lote 5.8: no desktop o quadro da caminhada guarda o guia da terra concluída, para ele aparecer comemorando.
- passage.timers.push(setTimeout(()=>worldView.select(to,{keep:STEP_COMPANIONS[from]}),FX.anda),setTimeout(closePassage,FX.passagem-FX.fecha));
+ // Lote 5.9: a passagem acorda a parada nova (pássaros, fogueira em Agir, flores ao sair da Clareira).
+ passage.timers.push(setTimeout(()=>worldView.select(to,{keep:STEP_COMPANIONS[from],passage:from}),FX.anda),setTimeout(closePassage,FX.passagem-FX.fecha));
 }
 // O mapa ocupa a área do bloco: deitado ele cresce para o lado, por cima da pergunta; em pé, para baixo, e empurra o painel
 // para fora da tela. Devolve o elemento, a volta e a animação (com fill, desfeita no fim).
@@ -395,7 +397,8 @@ window.scrollToWorld=()=>{let y=0;for(let e=$('world-stage');e;e=e.offsetParent)
 // Saindo por um toque, espera o toque terminar: a fila desce quando o mapa volta, e o clique tem de cair onde a pessoa tocou.
 const typingField=e=>!!e?.matches?.('#world-stage #experiment-fields :is(textarea,input:not([type=radio]):not([type=checkbox]))');
 let pressing=false;
-const syncTyping=()=>$('world-stage').toggleAttribute('data-typing',typingField(document.activeElement));
+// Lote 5.9: com um campo de texto em foco, o cenário entra em calmaria (vento e bichos no mínimo), em qualquer tela.
+const syncTyping=()=>{const on=typingField(document.activeElement);$('world-stage').toggleAttribute('data-typing',on);worldView?.setCalm(on);};
 function afterPress(fn){const go=()=>{removeEventListener('pointerup',go,true);removeEventListener('pointercancel',go,true);setTimeout(fn);};addEventListener('pointerup',go,true);addEventListener('pointercancel',go,true);}
 addEventListener('pointerdown',()=>{pressing=true;},true);addEventListener('pointerup',()=>{pressing=false;},true);addEventListener('pointercancel',()=>{pressing=false;},true);
 const portrait=matchMedia('(max-width:899px) and (orientation:portrait)');
