@@ -331,7 +331,11 @@ html:has(#bosque:not([hidden])){scroll-padding-top:var(--top-h,78px)}
  #world-stage[data-phase] .review-section h2{letter-spacing:-.01em}
 }
 @media(min-width:600px) and (max-width:899px) and (orientation:portrait){#world-stage[data-phase]:not([data-mapa]) .world-viewport{height:20svh}}
-@media(min-width:900px){#world-stage[data-phase]:not([data-mapa]) .world-viewport{height:26svh}}
+@media(min-width:900px){#world-stage{--mapa-h:26svh}#world-stage[data-phase]:not([data-mapa]) .world-viewport{height:var(--mapa-h)}}
+/* Lote 5.8: no desktop o mapa da fase fica mais alto, fixo por altura de janela: 29% em 720 px, 40% em 900 e 50% em 1080
+   (a folga medida abaixo do passo mais alto do 5.7), nunca menos que os 26% do 5.7 nem mais que 55%. A partir de 1200 px de
+   largura: em 1024×768 a pergunta, mais estreita, já rolava 29 px no 6.1 e passava a rolar 76 (QA A1). */
+@media(min-width:1200px){#world-stage{--mapa-h:clamp(26svh,max(80svh - 367px,100svh - 540px),55svh)}}
 /* Tela larga: os campos soltos de um passo dividem a linha (até três), o título fica à esquerda e a dica à direita. */
 @media(min-width:900px){
  #world-stage[data-phase] #experiment-fields{grid-template-columns:repeat(6,minmax(0,200px));align-items:start}
@@ -376,3 +380,28 @@ html:has(#bosque:not([hidden])){scroll-padding-top:var(--top-h,78px)}
 #world-stage[data-phase] #experiment-status:empty{display:none}
 @media(max-width:599px){#world-stage #part-skip{min-height:44px;padding:4px 10px;line-height:1.15}}
 @media(max-height:640px) and (min-aspect-ratio:4/3){#world-stage #part-skip{padding:4px 10px;line-height:1.15}}
+/* Lote 5.8: com o mapa mais alto, os passos mais altos de 1280×720 (revisão, 4.2 e 6.1) perdiam a folga. Só no desktop:
+   nos opcionais a frase faz o papel da dica e o primeiro bloco fica a 12 px dela; escolhas com menos opções que colunas
+   ocupam a linha (o texto cabe numa linha só); cada bloco da revisão fica numa linha, com título, estado e Editar. */
+@media(min-width:900px){
+ #world-stage[data-phase] #experiment-fields:not([data-part="0"])>.part-why{margin-bottom:-12px}
+ #world-stage[data-phase] .choice-grid{grid-template-columns:repeat(auto-fit,minmax(min(100%,210px),1fr))}
+ #world-stage[data-phase] .review-section{display:flex;flex-wrap:wrap;align-items:baseline;gap:0 10px;min-height:44px;padding:11px 56px 11px 12px}
+ #world-stage[data-phase] .review-section h2{margin:0}
+ #world-stage[data-phase] .review-section button{align-items:center}
+}
+/* Lote 5.8: no desktop as mensagens saem de cima da pergunta e ficam na base do mapa, entre os botões da câmera, numa faixa que
+   o enquadramento já deixa livre de paradas e personagens. Vale para a da pergunta (rascunho, exemplo, erro, "Fase concluída.")
+   e para a do mapa (parada que ainda não abriu, exploração); com as duas, a da pergunta fica à vista. Com o mapa mais alto, a faixa
+   sobre a pergunta cobria até 37 px do passo e a linha do mapa fazia a pergunta rolar 13 px (QA M1 e B1). Sem área da grade, a
+   posição conta a partir do bloco inteiro (item de grade com área usa a área como referência). Vale a partir de 1200 px, onde o
+   mapa ficou alto: em 1024×768 a dica de exploração tinha três linhas e cobria o Rumo (QA M4); ali fica como no 5.7. */
+@media(min-width:1200px){
+ #world-stage[data-phase] :is(#experiment-status,.world-status){grid-area:auto;position:absolute;left:50%;right:auto;top:calc(6px + var(--mapa-h) - 10px);bottom:auto;z-index:3;width:max-content;max-width:min(600px,calc(100% - 600px));margin:0;padding:6px 12px;border:2px solid var(--line);border-radius:12px;background:var(--cream);box-shadow:0 2px 0 var(--line-deep);transform:translate(-50%,-100%)}
+ #world-stage[data-phase] .world-status:empty,#world-stage[data-phase]:has(#experiment-status:not(:empty)) .world-status{display:none}
+}
+/* Lote 5.8: a lupa do "Ver bosque" aparece só no desktop; no celular os botões da câmera precisam caber numa linha (Lote 5.5). */
+.cam-icon{display:none}
+@media(min-width:900px){#world-stage .cam-icon{display:inline-block;margin-right:6px;vertical-align:-3px}
+ /* O guia que sai ou entra no quadro do foco perto esmaece em 0,2 s, em vez de piscar (QA M3 da 2ª rodada). */
+ #world-layer .map-figure{transition:opacity .2s,visibility .2s}}

@@ -38,6 +38,7 @@ const GUIDE_GESTURE=['acolher','apontar','andar','apontar','apontar','andar','ac
 const FX={toque:100,someToque:150,antes:90,pouso:320,poeira:300,olhar:180,volta:700,destrava:400,rascunho:200,pensar:300,passo:55,acende:170,festa:900,fade:150,
  abre:300,anda:240,fecha:300,passagem:1700};// Lote 5.7: o mapa abre em 300 ms, o Rumo sai aos 240 ms, tudo volta até 1,7 s
 const FIGURE_UNITS=1.55;// altura do desenho (viewBox de 260) em unidades do mundo: Rumo com 56 a 72 px no foco do celular
+const ZOOM_OUT='<svg class="cam-icon" viewBox="0 0 16 16" width="16" height="16" aria-hidden="true"><circle cx="7" cy="7" r="5" fill="none" stroke="currentColor" stroke-width="2"/><path d="M4.5 7h5M11 11l3.5 3.5" stroke="currentColor" stroke-width="2" stroke-linecap="round"/></svg>',ZOOM_IN=ZOOM_OUT.replace('M4.5 7h5','M4.5 7h5M7 4.5v5');
 const LOCK_OPEN='<svg viewBox="0 0 16 16" width="14" height="14" aria-hidden="true"><path d="M11 7V4a3 3 0 0 0-6 0v1" fill="none" stroke="currentColor" stroke-width="2"/><rect x="3.5" y="7" width="9" height="7" rx="1.5" fill="currentColor"/></svg>';
 let mapLayer=null,mapAnchors=null,mapQuiet=false,mapWasOff=false,thoughtStep=-1;
 const mapRuns=new Map(),mapTimers=new Map();
@@ -47,7 +48,8 @@ function buildMapLayer(){
  mapLayer.innerHTML=MAP_CAST.map(n=>`<div class="map-figure" data-figure="${n}"><div class="map-body">${companion(n)}</div></div>`).join('');
  $('world-viewport').append(mapLayer);
 }
-const fxScale=a=>Math.min(130,Math.max(46,a.unit*FIGURE_UNITS))/130;
+// Lote 5.8: no desktop o desenho pode chegar a 200 px (a.figMax), para acompanhar o foco perto do Rumo; no resto, 130 px.
+const fxScale=a=>Math.min(a.figMax||130,Math.max(46,a.unit*FIGURE_UNITS))/130;
 // Anéis seguem a escala do mundo; confete e poeira têm piso, para continuarem visíveis com o bosque inteiro na tela.
 function placeFx(e){const a=mapAnchors,p=e.dataset.at==='rumo'?a.rumo:a.stops[e.dataset.at];e.style.transform=`translate(${p.x}px,${p.y}px) scale(${Math.max(fxScale(a),Number(e.dataset.min||0))})`;}
 // Base do desenho: caixa de 120×130 px com os pés em (60, 119); a escala segue o zoom, com piso e teto para leitura.
@@ -55,7 +57,8 @@ function layoutMap(a){
  mapAnchors=a;if(!mapLayer)return;const k=fxScale(a);
  for(const f of mapLayer.querySelectorAll('.map-figure')){const p=f.dataset.figure==='rumo'?a.rumo:a.guides[f.dataset.figure];f.style.transform=`translate(${p.x-60*k}px,${p.y-119*k}px) scale(${k})`;f.style.zIndex=Math.round((1-p.z)*1e4);}// o mais perto da câmera fica por cima
  // Lote 5.7: na faixa curta o quadro fica no Rumo e na parada; guia que não cabe inteiro na faixa não aparece, em vez de cortado.
- const short=worldView?.state().short;for(const f of mapLayer.querySelectorAll('.map-figure:not([data-figure=rumo])')){const p=a.guides[f.dataset.figure];f.style.visibility=short&&(p.x-60*k<0||p.x+60*k>a.width||p.y-119*k<0||p.y+11*k>a.height)?'hidden':'';}
+ // Lote 5.8: o mesmo no foco perto do desktop (a.close), onde inteiro é também acima da faixa dos botões da câmera.
+ const short=a.short||a.close,floor=a.height-(a.close?a.inset||0:0);for(const f of mapLayer.querySelectorAll('.map-figure:not([data-figure=rumo])')){const p=a.guides[f.dataset.figure],out=short&&(p.x-60*k<0||p.x+60*k>a.width||p.y-119*k<0||p.y+11*k>floor);f.style.visibility=out?'hidden':'';f.style.opacity=out?'0':'';}
  mapLayer.querySelectorAll('.map-fx').forEach(placeFx);
 }
 function track(key,runs){mapRuns.set(key,[...(mapRuns.get(key)||[]).filter(a=>a.playState==='running'),...runs]);return runs;}
@@ -202,9 +205,9 @@ function syncWorld(){
  if(worldFailed)return;
  if(!worldView){
   if(worldLoading)return;worldLoading=true;
-  const script=document.createElement('script');script.src='media/world/bosque.bundle.js?v=9';
+  const script=document.createElement('script');script.src='media/world/bosque.bundle.js?v=13';
   script.onerror=()=>worldFallback('Não foi possível abrir o 3D. As paradas e as perguntas continuam disponíveis.');
-  script.onload=()=>{try{buildMapLayer();worldView=Bosque.create($('world-viewport'),{onSelect:goStop,onError:worldFallback,onView:paintWorldCamera,onFrame:layoutMap,onWalk:onRumoWalk});window.mapWorld=worldView;measureInsets();$('world-viewport').dataset.ready='true';paintWorld();const done=worldDomain().recorded&&!lab.started;mapQuiet=true;worldView.select(done?6:lab.step,{instant:true});mapQuiet=false;if(done)worldView.camera('center');syncWorld();}catch{worldFallback('Seu navegador não abriu o 3D. Use a lista de paradas.');}};
+  script.onload=()=>{try{buildMapLayer();worldView=Bosque.create($('world-viewport'),{onSelect:goStop,onError:worldFallback,onView:paintWorldCamera,onFrame:layoutMap,onWalk:onRumoWalk});window.mapWorld=worldView;measureInsets();$('world-viewport').dataset.ready='true';paintWorld();const done=worldDomain().recorded&&!lab.started;mapQuiet=true;worldView.select(done?6:lab.step,{instant:true});mapQuiet=false;if(done)worldView.camera('center');syncWorld();if(!done)worldView.intro();}catch{worldFallback('Seu navegador não abriu o 3D. Use a lista de paradas.');}};
   document.head.append(script);return;
  }
  worldView.setActive(true);worldView.setMotion(!motionOff());measureInsets();
@@ -220,7 +223,8 @@ function measureInsets(){
 }
 addEventListener('resize',measureInsets);
 function paintWorldCamera(state){
- $('world-overview').textContent=state.overview?'Voltar à parada':'Ver bosque';
+ // Lote 5.8: uma lupa diz o que o botão faz: afastar para ver o bosque inteiro, aproximar para voltar à parada.
+ $('world-overview').innerHTML=(state.overview?ZOOM_IN:ZOOM_OUT)+(state.overview?'Voltar à parada':'Ver bosque');
  $('world-explore').setAttribute('aria-pressed',String(!!state.exploring));$('world-explore').innerHTML=state.exploring?'Sair<span class="cam-extra"> da exploração</span>':'Explorar<span class="cam-extra"> mapa</span>';
  const hint='Exploração livre: arraste em qualquer direção e use dois dedos para aproximar. Toque em Sair quando terminar.';
  if(worldFailed)return;measureInsets();if(state.exploring)setWorldStatus(hint);else if($('world-status').textContent===hint)setWorldStatus('');
@@ -305,7 +309,8 @@ function passPhase(from){
  const vp=$('world-viewport');let note=vp.querySelector('.passage-note');if(!note){note=document.createElement('p');note.className='passage-note';note.setAttribute('aria-hidden','true');vp.append(note);}
  note.textContent=`Fase ${from+1} concluída`;$('world-live').textContent=`Fase ${from+1} concluída.`;
  passage={from,to,timers:[],...growMap(FX.abre)};
- passage.timers.push(setTimeout(()=>worldView.select(to),FX.anda),setTimeout(closePassage,FX.passagem-FX.fecha));
+ // Lote 5.8: no desktop o quadro da caminhada guarda o guia da terra concluída, para ele aparecer comemorando.
+ passage.timers.push(setTimeout(()=>worldView.select(to,{keep:STEP_COMPANIONS[from]}),FX.anda),setTimeout(closePassage,FX.passagem-FX.fecha));
 }
 // O mapa ocupa a área do bloco: deitado ele cresce para o lado, por cima da pergunta; em pé, para baixo, e empurra o painel
 // para fora da tela. Devolve o elemento, a volta e a animação (com fill, desfeita no fim).
@@ -328,7 +333,10 @@ addEventListener('resize',syncCompact);SIDE.addEventListener('change',()=>{finis
 // em 2,5 s, depois de anunciado. O erro fica até a pessoa responder.
 let statusTimer=0;
 new MutationObserver(()=>{const s=$('experiment-status');clearTimeout(statusTimer);if(worldOwnsForm()&&s.textContent&&s.dataset.error!=='true')statusTimer=setTimeout(()=>{if(worldOwnsForm()&&s.dataset.error!=='true')s.textContent='';},2500);}).observe($('experiment-status'),{childList:true,characterData:true,subtree:true});
-const shortMap=()=>!SIDE.matches&&$('world-stage').hasAttribute('data-phase')&&$('world-viewport').getBoundingClientRect().height<170;
+// Lote 5.8: o tablet em pé também. Com a trilha subindo, o bosque inteiro na faixa de 20% ficava menor que no 5.7 (paradas a
+// 68 px, eram 84); com o mapa do tamanho do 5.6 elas voltam a ter espaço.
+const TABLET=matchMedia('(min-width:600px) and (max-width:899px) and (orientation:portrait)');TABLET.addEventListener('change',()=>closeMap(true));// girar fecha, como no celular
+const shortMap=()=>!SIDE.matches&&$('world-stage').hasAttribute('data-phase')&&($('world-viewport').getBoundingClientRect().height<170||TABLET.matches);
 function resizeMap(change,duration){const vp=$('world-viewport'),h0=vp.getBoundingClientRect().height;change();const h1=vp.getBoundingClientRect().height;
  return duration&&!motionOff()&&Math.abs(h1-h0)>1?vp.animate([{height:h0+'px'},{height:h1+'px'}],{duration,easing:E.chega}):null;}
 function openMap(){if(mapOpen||!shortMap())return;finishPassage();mapOpen={a:resizeMap(()=>{$('world-stage').dataset.mapa='';},FX.abre)};}
@@ -343,7 +351,7 @@ function celebratePhase(from){
  Promise.allSettled(run.map(r=>r.finished)).then(r=>{if(r.every(x=>x.status==='fulfilled'))fig.dataset.state='welcome';});
 }
 function closePassage(){
- const p=passage;if(!p?.el||p.closing)return;p.closing=true;$('world-stage').dataset.closing='';
+ const p=passage;if(!p?.el||p.closing)return;p.closing=true;worldView?.setKeep(null);$('world-stage').dataset.closing='';
  const back=p.el.animate(p.back,{duration:FX.fecha,easing:E.chega,fill:'forwards'});p.anims.push(back);
  back.finished.then(()=>{if(passage===p)endPassage();},()=>{});
 }
@@ -354,6 +362,10 @@ function finishPassage(){
  if(worldView?.state().hop||worldView?.state().selected!==p.to)worldView?.select(p.to,{instant:true});
  stopRuns(STEP_COMPANIONS[p.from]);stopRuns('fx');st.dataset.instant='';endPassage();void st.offsetHeight;delete st.dataset.instant;
 }
+// Lote 5.8: um toque ou uma tecla terminam a entrada do desktop na parada atual, aproximando em 0,5 s. Toque no 3D e nos
+// botões da câmera fica com eles: o renderer escolhe a parada com a câmera que está na tela (QA A1) e "Voltar à parada" aproxima
+// de onde a câmera está (QA A2).
+addEventListener('pointerdown',e=>{if(!e.target.closest?.('#world-camera,#world-viewport canvas'))worldView?.skipIntro();},true);addEventListener('keydown',()=>worldView?.skipIntro(),true);
 // QA B6: tocar numa parada da fila durante a passagem abre essa parada (a fila muda de lugar quando o mapa encolhe).
 addEventListener('pointerdown',e=>{if(!passage?.el)return;const s=e.target.closest?.('[data-world-stop]');finishPassage();if(s)goStop(Number(s.dataset.worldStop));},true);
 // QA M2: a tecla que pula a passagem não rola a página (o foco está no título da fase nova).
@@ -364,7 +376,7 @@ document.addEventListener('input',e=>{if(worldOwnsForm()&&e.target.closest('#exp
  if(thoughtStep!==lab.step&&e.target.matches('textarea,input:not([type=radio]):not([type=checkbox])')){thoughtStep=lab.step;think();}}});
 document.addEventListener('change',e=>{if(worldOwnsForm()&&e.target.closest('#experiment-form'))paintWorld();});
 $('world-nodes').onclick=e=>{const button=e.target.closest('[data-world-stop]');if(button)goStop(Number(button.dataset.worldStop));};
-$('world-overview').onclick=()=>{if(!worldView)return;if(mapOpen&&worldView.state().overview){closeMap();return;}openMap();worldView.camera(worldView.state().overview?'focus':'center');};
+$('world-overview').onclick=()=>{if(!worldView)return;if(mapOpen&&worldView.state().overview){closeMap();return;}openMap();worldView.camera(worldView.state().overview?'focus':'center',{animate:true});};// Lote 5.8: no desktop, com zoom em movimento
 $('world-explore').onclick=()=>{if(!worldView)return;if(mapOpen&&worldView.state().exploring){closeMap();return;}openMap();worldView.setExplore(!worldView.state().exploring);};
 $('world-camera').querySelector('.world-adjust').onclick=e=>{const button=e.target.closest('[data-camera]');if(button)worldView?.camera(button.dataset.camera);};
 $('world-example').onclick=()=>{worldAutoStart=false;$('experiment-example').click();};
