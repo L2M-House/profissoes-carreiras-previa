@@ -437,13 +437,13 @@ void RE_IndirectDiffuse_Lambert(const in vec3 irradiance,const in vec3 geometryP
   for(const s of stops)glow.setMatrixAt(3+s.index,s.lamp.visible?matrixOf([...s.lamp.getWorldPosition(spot).toArray(),.36,.36,.36,0,0,0]):hidden);glow.instanceMatrix.needsUpdate=true;
   for(const k in markers)markers[k].instanceMatrix.needsUpdate=true;badgeGeo.attributes.position.needsUpdate=true;
  }
- function drawBadge(stop,{state,zone}){
+ function drawBadge(stop,{state,zone,glyph:mark}){// Lote 5.10: the bridge may pass the symbol, the same as in the list and the legend
   const c=atlas.getContext('2d'),locked=state==='bloqueada',focus=state==='foco';
   c.save();c.translate(stop.index*128,0);
   c.clearRect(0,0,128,128);c.beginPath();c.arc(64,64,54,0,Math.PI*2);c.fillStyle=focus?colors.sun:colors.ivory;c.fill();c.lineWidth=12;c.strokeStyle=ZONES[zone]||colors.ink;c.stroke();
   c.fillStyle=colors.ink;c.strokeStyle=colors.ink;c.textAlign='center';c.textBaseline='middle';
   if(locked){c.lineWidth=7;c.beginPath();c.arc(64,54,14,Math.PI,0);c.stroke();c.fillRect(44,56,40,30);}
-  else{const glyph={guardado:'✓',rascunho:'✎',adiado:'↷'}[state]||String(stop.index+1);c.font=`900 ${glyph.length>1?40:58}px Nunito, sans-serif`;c.fillText(glyph,64,68);}
+  else{const glyph=mark||{guardado:'✓',rascunho:'✎',adiado:'↷'}[state]||String(stop.index+1);c.font=`900 ${glyph.length>1?40:58}px Nunito, sans-serif`;c.fillText(glyph,64,68);}
   c.restore();atlasTexture.needsUpdate=true;
  }
  // Rumo replaced the compass piece (Lote 5.4): the bridge draws him in SVG; the scene keeps only his anchor, with no mesh.

@@ -378,6 +378,8 @@ html:has(#bosque:not([hidden])){scroll-padding-top:var(--top-h,78px)}
 #world-stage[data-phase]{position:relative}
 #world-stage[data-phase] #experiment-status{position:absolute;left:12px;right:12px;bottom:4px;z-index:1;margin:0;padding:6px 12px;border:2px solid var(--line);border-radius:12px;background:var(--cream);box-shadow:0 2px 0 var(--line-deep)}
 #world-stage[data-phase] #experiment-status:empty{display:none}
+/* QA M9 (17/10): a faixa de mensagem não segura o toque no campo que ela cobre. */
+#world-stage[data-phase] #experiment-status{pointer-events:none}
 @media(max-width:599px){#world-stage #part-skip{min-height:44px;padding:4px 10px;line-height:1.15}}
 @media(max-height:640px) and (min-aspect-ratio:4/3){#world-stage #part-skip{padding:4px 10px;line-height:1.15}}
 /* Lote 5.8: com o mapa mais alto, os passos mais altos de 1280×720 (revisão, 4.2 e 6.1) perdiam a folga. Só no desktop:
@@ -405,3 +407,124 @@ html:has(#bosque:not([hidden])){scroll-padding-top:var(--top-h,78px)}
 @media(min-width:900px){#world-stage .cam-icon{display:inline-block;margin-right:6px;vertical-align:-3px}
  /* O guia que sai ou entra no quadro do foco perto esmaece em 0,2 s, em vez de piscar (QA M3 da 2ª rodada). */
  #world-layer .map-figure{transition:opacity .2s,visibility .2s}}
+/* Lote 5.10: mostrar. A criança reconhece tudo na tela: a entrada diz qual botão é de quem, o topo da pergunta diz a fase, a
+   fila e o mapa usam os mesmos nomes e símbolos, cada botão diz o que faz e os balões ficam na camada de cima, sem mudar o
+   layout nem a rolagem. Nada aqui ganha altura: em 390×844 e 1280×720 alguns passos têm de 7 a 13 px de folga, e deitado
+   nenhuma. */
+.hero-note{margin:14px 0 0;font-size:15px;line-height:1.45;color:var(--muted)}
+.hero-login{min-height:44px;padding:0;border:0;background:none;font:inherit;font-weight:900;color:var(--ink);text-decoration:underline;text-underline-offset:3px;cursor:pointer}
+/* O grau da bússola fica só na rota dos Pais. */
+body[data-programa=filho] #trilha :is(.station-degree,.dock-bearing,.map-direction){display:none}
+/* Topo da pergunta em duas linhas, ao lado do botão de ajuda (a linha dele já tinha 44 px): "Fase 4 de 7 · Placa" e, embaixo,
+   a etapa e o passo. Deitado, numa linha só. */
+#world-stage #world-place-zone{flex-basis:100%;color:var(--ink);letter-spacing:0}
+#world-stage .world-place-stage{margin:0;font-size:14px;font-weight:800;line-height:1.4;color:var(--muted)}
+@media(max-height:640px) and (min-aspect-ratio:4/3){#world-stage #world-place-zone{flex-basis:auto}}
+/* Sem o botão de ajuda ao lado (Mirante), a linha do topo não tem os 44 px dele: fase, etapa e passo cabem numa linha só. */
+#world-stage:has(#lab-help[hidden]) #world-place-zone{flex-basis:auto}
+/* O botão de ajuda leva o nome de quem ajuda: "Pedir ajuda ao Bino". No celular e deitado, em duas linhas, para o topo caber. */
+.help-world{display:none}
+#world-stage #lab-help .help-world{display:inline}
+#world-stage #lab-help :is(.help-long,.help-short){display:none}
+@media(max-width:599px),(max-height:640px) and (min-aspect-ratio:4/3){
+ #world-stage #lab-help{white-space:normal;text-align:left;line-height:1.15}
+ #world-stage #lab-help .help-world>span{display:block}
+ #world-stage .companion-stage{gap:6px;padding-right:10px}
+}
+@media(max-width:599px){
+ #world-stage .world-place-head{margin:6px 4px 0 12px}
+ #world-stage .companion-stage{margin-right:12px}
+ #world-stage #world-place-zone{font-weight:800}
+ /* A barra de passos sai no celular; o texto "Passo 1 de 2" fica. */
+ #world-stage .part-bar{display:none}
+}
+/* Botões da câmera com o texto inteiro em todo tamanho. No celular e deitado eles dividem a linha e o texto quebra dentro do
+   botão, para não abrir uma segunda linha sobre o mapa. */
+@media(max-width:599px),(max-height:640px) and (min-aspect-ratio:4/3){
+ #world-stage .world-camera{flex-wrap:nowrap}
+ #world-stage .world-camera>button,#world-stage .world-adjust summary{min-width:44px;padding:4px 8px;line-height:1.1;text-align:left}
+ #world-stage .world-camera>button{flex:0 1 auto}
+ #world-stage .world-adjust{flex:0 1 auto;min-width:0}
+}
+/* Fila das fases: o nome da parada ao lado do círculo, com o estado embaixo. No desktop todos; no tablet em pé, o da atual. No
+   celular e deitado não há largura: o nome da atual fica no topo da pergunta e no mapa, e o das outras aparece ao tocar. */
+.node-name{display:none}
+@media(min-width:900px) and (min-height:641px){
+ #world-stage .world-steps{width:min(100% - 16px,1080px);container-type:inline-size}
+ #world-stage .world-steps li{display:flex;align-items:center;gap:6px}
+ #world-stage .node-name{display:flex;flex-direction:column;padding-right:6px;background:var(--white);font-size:14px;line-height:1.2;color:var(--ink);cursor:pointer}
+ #world-stage .node-name b{font-weight:900}
+ #world-stage .node-name small{font-size:14px;font-weight:700;color:var(--muted)}
+ #world-stage .node-name[data-look=aqui] small{color:var(--ink);font-weight:900}
+}
+@container (max-width:900px){#world-stage .node-name:not([data-look=aqui]) small{display:none}}
+@media(min-width:600px) and (max-width:899px) and (orientation:portrait){
+ #world-stage .world-steps li:has([aria-current]){display:flex;align-items:center;gap:6px}
+ #world-stage li:has([aria-current]) .node-name{display:flex;flex-direction:column;padding-right:6px;background:var(--white);font-size:14px;line-height:1.2}
+ #world-stage li:has([aria-current]) .node-name small{font-size:14px;font-weight:900}
+}
+/* Estados com o mesmo símbolo e o mesmo nome na fila, no mapa e na legenda. */
+.world-node[data-look=aqui]{background:var(--sun);border-color:var(--ink);transform:scale(1.12);box-shadow:0 3px 0 var(--line-deep)}
+.world-node[data-look=feita]{background:var(--leaf)}
+/* QA M1 (17/10): com o exercício guardado, a fase deixada para depois continua branca, como na legenda. */
+.world-node[data-look=depois]{background:var(--white)}
+.world-node[data-look=fechada]{border-style:dashed;color:var(--muted)}
+/* "Dicas", no canto de cima do mapa, sempre no mesmo lugar: reabre as dicas e a legenda. */
+.world-guide-open{position:absolute;left:10px;top:10px;z-index:2;display:inline-flex;align-items:center;gap:6px;min-width:44px;min-height:44px;padding:6px 12px 6px 6px;border:2px solid var(--line);border-radius:999px;background:var(--white);box-shadow:0 2px 0 var(--line-deep);font:inherit;font-size:14px;font-weight:900;color:var(--ink);cursor:pointer}
+.world-guide-open:active{transform:translateY(2px);box-shadow:0 0 0 var(--line-deep)}
+.guide-q{display:grid;place-items:center;width:28px;height:28px;border-radius:50%;background:var(--ink);color:var(--white);font-size:16px;line-height:1}
+#world-stage[data-passage] .world-guide-open{opacity:0;pointer-events:none}
+/* Com um campo de texto em foco no celular e no tablet em pé o mapa recolhe e a fila sobe: o botão sai junto com o mapa, como
+   os da câmera, para não cobrir as primeiras fases da fila. */
+@media(max-width:899px) and (orientation:portrait){#world-stage[data-typing] .world-guide-open{display:none}}
+@media(max-width:599px),(max-height:640px) and (min-aspect-ratio:4/3){.world-guide-open{left:8px;top:8px}}
+/* Rótulos no mapa: nome curto de cada personagem e "Você está aqui", em texto de 14 px que não muda com o zoom. */
+.map-tags{position:absolute;inset:0;z-index:30000;pointer-events:none}
+.map-name,.map-here{position:absolute;left:0;top:0;border:2px solid var(--line);background:var(--white);color:var(--ink);font-size:14px;font-weight:900;line-height:1.2;white-space:nowrap}
+/* QA M7 (17/10): o nome não é alvo de toque (teria 23 px); o toque é no desenho do personagem. */
+.map-name{padding:1px 8px;border-radius:999px}
+.map-here{display:flex;flex-direction:column;align-items:center;padding:2px 10px;border-color:var(--ink);border-radius:12px}
+.map-here small{font-size:14px;font-weight:800}
+.world-layer .companion svg{pointer-events:visiblePainted;cursor:pointer}
+/* Balão de fala: borda tinta, ponta para o elemento, sem sombra de botão. Na camada de cima, sem mexer no layout. */
+.world-tip{position:fixed;inset:auto;margin:0;width:max-content;max-width:min(340px,calc(100% - 16px));padding:12px 14px;border:2px solid var(--ink);border-radius:18px;background:var(--white);color:var(--ink);overflow:visible}
+.world-tip:popover-open{display:flex;align-items:flex-start;gap:10px}
+.world-tip::before{content:"";position:absolute;left:var(--tail,50%);width:14px;height:14px;background:var(--white);border:2px solid var(--ink);transform:translateX(-50%) rotate(45deg)}
+.world-tip[data-side=below]::before{top:-9px;border-right:0;border-bottom:0}
+.world-tip[data-side=above]::before{bottom:-9px;border-left:0;border-top:0}
+.world-tip[data-side=over]::before{display:none}
+/* Balão só de informação não recebe toque: o toque segue para o botão que estiver embaixo e o fecha. */
+.world-tip:is([data-kind=fechada],[data-kind=papel]){pointer-events:none}
+.tip-face{position:relative;flex:none;width:40px;height:40px;border-radius:50%;overflow:hidden;background:var(--cream)}
+.tip-face[hidden]{display:none}
+.tip-face .companion{position:absolute;width:var(--face-w,71px);left:var(--face-x,-15px);top:var(--face-y,-22px)}
+.tip-face [data-character=bino]{--face-w:71px;--face-x:-15px;--face-y:-7px}
+.tip-face [data-character=pipa]{--face-w:99px;--face-x:-29px;--face-y:-14px}
+.tip-face [data-character=teo]{--face-w:75px;--face-x:-34px;--face-y:-16px}
+.tip-body{min-width:0}
+.tip-text{margin:0;font-size:15px;line-height:1.4;font-weight:700}
+.tip-text b{display:block;font-weight:900}
+.tip-foot{display:flex;align-items:center;justify-content:space-between;gap:12px;margin-top:8px}
+.tip-foot[hidden]{display:none}
+.tip-count{font-size:14px;font-weight:800;color:var(--muted)}
+.tip-ok{min-height:44px;padding:8px 18px;border:2px solid var(--ink);border-radius:12px;background:var(--sun);font:inherit;font-size:15px;font-weight:900;color:var(--ink);cursor:pointer}
+.tip-ok:focus-visible,.world-guide-open:focus-visible,.map-name:focus-visible{outline:3px solid var(--ink);outline-offset:3px}
+/* Legenda: os estados, as quatro etapas e quem é quem. Rola por dentro se a tela for baixa. */
+.world-guide{position:fixed;inset:auto;margin:0;width:min(420px,calc(100% - 16px));max-height:calc(100% - 16px);overflow:auto;padding:16px 18px;border:2px solid var(--ink);border-radius:20px;background:var(--white);color:var(--ink)}
+.world-guide h2{margin:0 0 10px;font-size:18px}
+.world-guide h3{margin:16px 0 8px;font-size:16px}
+.world-guide ul{display:grid;gap:8px;margin:0;padding:0;list-style:none}
+.world-guide li{font-size:15px;line-height:1.4}
+.guide-looks li,.guide-cast li{display:flex;align-items:center;gap:10px}
+.guide-looks .world-node{--stage:var(--ink);flex:none;pointer-events:none}/* QA B4: sem o efeito de passar o mouse */
+.guide-looks b{display:block;font-weight:900}
+.guide-looks small{display:block;font-size:14px;color:var(--muted)}
+/* QA M8 (17/10): o topo da legenda, com "Fechar", fica preso enquanto ela rola. */
+.guide-head{position:sticky;top:-16px;z-index:1;display:flex;align-items:center;justify-content:space-between;gap:12px;margin:-16px -18px 10px;padding:10px 18px;border-bottom:2px solid var(--line);background:var(--white)}
+.world-guide .guide-head h2{margin:0}
+.guide-note{margin:0 0 8px;font-size:14px;color:var(--muted)}
+.guide-stages li{display:flex;align-items:flex-start;gap:10px}
+.stage-dot{flex:none;width:18px;height:18px;margin-top:2px;border:3px solid var(--stage);border-radius:50%;background:var(--white)}
+.guide-actions{display:flex;flex-wrap:wrap;gap:10px;margin-top:16px}
+.guide-actions .back{min-height:44px}
+@media(prefers-reduced-motion:reduce){.world-guide-open{transition:none}}

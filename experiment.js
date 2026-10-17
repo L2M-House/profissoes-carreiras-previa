@@ -38,7 +38,8 @@ function sourceField(){const t=labData().searchType;return t&&t!=='Definir depoi
 function limitChoices(){['activities','values'].forEach(name=>{const els=[...$('experiment-form').querySelectorAll(`[name="${name}"]`)];const count=els.filter(x=>x.checked).length;els.forEach(el=>el.disabled=count>=3&&!el.checked);const counter=$(name+'-count');if(counter)counter.textContent=`${count} de até 3 selecionadas`;});}
 function stepValid(){return Journey.validStep(lab.step,labData());}
 // Lote 5.7: o passo 1 de cada fase do bosque usa a mesma checagem antes de abrir o passo seguinte.
-function checkStep(){collectLab();if(stepValid())return true;reactCompanion('encourage');status('experiment-status','Preencha a pergunta para continuar ou escolha deixar para depois.',true);return false;}
+// Lote 5.10: no bosque o aviso usa o nome do botão, "Responder depois"; na página do laboratório continua como antes.
+function checkStep(){collectLab();if(stepValid())return true;reactCompanion('encourage');status('experiment-status',`Preencha a pergunta para continuar ou ${$('experiment-form').closest('#world-stage')?'toque em Responder depois':'escolha deixar para depois'}.`,true);return false;}
 // Lote 5.7: no passo opcional do bosque o título fica só para o leitor de tela; o foco vai para a frase visível.
 function focusLab(){const h=$('experiment-fields').querySelector('.part-why:not(:empty)')||$('experiment-fields').querySelector('h1');h.tabIndex=-1;h.focus({preventScroll:true});const stage=$('experiment-form').closest('#world-stage');if(stage){stage.scrollIntoView({block:'start',behavior:'instant'});h.scrollIntoView({block:'nearest',behavior:'instant'});}else window.scrollTo({top:0,behavior:'instant'});}
 $('experiment-start').onclick=()=>{lab.started=true;labSaved=false;labStore();renderExperiment();focusLab();};

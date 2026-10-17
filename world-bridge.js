@@ -3,7 +3,12 @@
 const PLACES=['Clareira','Moinho','Ponte','Placa','Bifurcação','Acampamento','Mirante'];
 const STOPS=Journey.steps.map((s,i)=>({...s,place:PLACES[i],mark:MARCAS.find(m=>m.id===s.stage)}));
 const LOCK='<svg viewBox="0 0 16 16" width="14" height="14" aria-hidden="true"><path d="M5 7V5a3 3 0 0 1 6 0v2" fill="none" stroke="currentColor" stroke-width="2"/><rect x="3.5" y="7" width="9" height="7" rx="1.5" fill="currentColor"/></svg>';
-const STATE_TEXT={bloqueada:'Abre depois da parada anterior',foco:'Você está aqui',rascunho:'Rascunho guardado nesta aba',adiado:'Deixada para investigar depois',guardado:'Registro guardado',disponível:'Disponível'};
+// Lote 5.10: cada estado tem o mesmo nome e o mesmo símbolo no mapa, na fila e na legenda. O contrato não muda: a ponte lê o
+// estado dele e o rascunho. Feita é a fase com o passo 1 respondido (ou o exercício guardado); começada, a que tem alguma
+// resposta sem ele; aberta, a que ainda não tem nenhuma.
+const LOOK_TEXT={aqui:'Você está aqui',feita:'Feita',comecada:'Começada',depois:'Deixada para depois',fechada:'Fechada',aberta:'Aberta'};
+const LOOK_GLYPH={feita:'✓',comecada:'✎',depois:'↷'};
+const filled=v=>Array.isArray(v)?v.length>0:!!String(v??'').trim();
 const LAB_HOME=[$('experiment-form').parentElement,$('experiment-form').nextSibling];
 let worldView,worldLoading=false,worldFailed=false,worldCelebrationPending=null,worldAutoStart=false,worldEntering=false;
 // Lote 5.7: cada parada é uma fase de passos curtos, um por tela. O passo 1 é o obrigatório do contrato (Journey.validStep);
@@ -17,10 +22,14 @@ const SIDE=matchMedia('(max-height:640px) and (min-aspect-ratio:4/3)');// o mesm
 let part=0,passing=null,enterLast=false,passage=null;
 const worldOwnsForm=()=>$('world-question').contains($('experiment-form'));
 const shownState=s=>s.available?s.state:'bloqueada';
+const lookOf=(s,data)=>!s.available?'fechada':s.state==='guardado'?(data['skip'+s.index]?'depois':'feita'):{foco:'aqui',rascunho:'feita',adiado:'depois'}[s.state]||(PARTS[s.index].flat().some(n=>filled(data[n]))?'comecada':'aberta');
 function worldDomain(){
  const snapshot=lab.owner===owner()&&lab.programa===programa?lab:journeys()[journeyKey('experiment')]?.snapshot||{owner:owner(),programa,step:0,data:{},started:false};
  const recorded=!snapshot.started&&answers().some(a=>a.quem===owner()&&a.programa===programa&&a.experimento?.versao===1);
- return {snapshot,recorded,steps:Journey.project(snapshot,recorded)};
+ // Lote 5.10: com o exercício guardado, a aparência de cada fase vem das respostas guardadas: deixada para depois continua assim
+ // (achado do QA: tudo adiado e guardado aparecia como "Feita").
+ const saved=recorded?answers().filter(a=>a.quem===owner()&&a.programa===programa&&a.experimento?.versao===1).at(-1)?.experimento?.respostas:null;
+ return {snapshot,recorded,steps:Journey.project(snapshot,recorded),data:saved||snapshot.data||{}};
 }
 function celebrateWorldIfPending(){
  if(current!=='trilha'||programa!=='filho')return false;
@@ -45,7 +54,11 @@ const mapRuns=new Map(),mapTimers=new Map();
 const figureOf=name=>mapLayer?.querySelector(`[data-figure=${name}] .companion`);
 function buildMapLayer(){
  mapLayer=document.createElement('div');mapLayer.className='world-layer';mapLayer.id='world-layer';mapLayer.setAttribute('aria-hidden','true');mapLayer.dataset.celebrations='0';
- mapLayer.innerHTML=MAP_CAST.map(n=>`<div class="map-figure" data-figure="${n}"><div class="map-body">${companion(n)}</div></div>`).join('');
+ mapLayer.innerHTML=MAP_CAST.map(n=>`<div class="map-figure" data-figure="${n}"><div class="map-body">${companion(n)}</div></div>`).join('')+
+  // Lote 5.10: o nome curto de cada um e o "Você está aqui", em texto de tamanho fixo, presos aos mesmos pontos.
+  `<div class="map-tags">${MAP_CAST.map(n=>`<span class="map-name" data-name="${n}">${ELENCO[n].name}</span>`).join('')}<span class="map-here"><b></b><small>${LOOK_TEXT.aqui}</small></span></div>`;
+ // Tocar num personagem (ou no nome dele) faz ele dizer, num balão, para que serve.
+ mapLayer.addEventListener('click',e=>{const t=e.target.closest('[data-figure],[data-name]');if(t)roleNote(t.dataset.figure||t.dataset.name);});
  $('world-viewport').append(mapLayer);
 }
 // Lote 5.8: no desktop o desenho pode chegar a 200 px (a.figMax), para acompanhar o foco perto do Rumo; no resto, 130 px.
@@ -59,7 +72,24 @@ function layoutMap(a){
  // Lote 5.7: na faixa curta o quadro fica no Rumo e na parada; guia que não cabe inteiro na faixa não aparece, em vez de cortado.
  // Lote 5.8: o mesmo no foco perto do desktop (a.close), onde inteiro é também acima da faixa dos botões da câmera.
  const short=a.short||a.close,floor=a.height-(a.close?a.inset||0:0);for(const f of mapLayer.querySelectorAll('.map-figure:not([data-figure=rumo])')){const p=a.guides[f.dataset.figure],out=short&&(p.x-60*k<0||p.x+60*k>a.width||p.y-119*k<0||p.y+11*k>floor);f.style.visibility=out?'hidden':'';f.style.opacity=out?'0':'';}
- mapLayer.querySelectorAll('.map-fx').forEach(placeFx);
+ mapLayer.querySelectorAll('.map-fx').forEach(placeFx);layoutTags(a);if(note)placeNote();
+}
+// Lote 5.10: os rótulos têm texto de tamanho fixo (14 px) e ficam fora do desenho: embaixo dos pés, em cima da cabeça ou do
+// lado, dentro da faixa acima dos botões, sem cobrir um personagem, o botão de dicas nem outro rótulo. Primeiro o "Você está
+// aqui", depois os nomes; um nome que não cabe em lugar nenhum, ou cujo personagem saiu do quadro, não aparece.
+let guideBox=null;
+function layoutTags(a){
+ const tags=mapLayer?.querySelector('.map-tags');if(!tags)return;const k=fxScale(a),floor=a.height-(a.inset||0),taken=guideBox?[guideBox]:[];
+ const figs=MAP_CAST.map(n=>{const f=mapLayer.querySelector(`[data-figure=${n}]`),p=n==='rumo'?a.rumo:a.guides[n];return {n,p,on:f.style.visibility!=='hidden',box:{x:p.x-45*k,y:p.y-112*k,w:90*k,h:120*k}};});
+ // QA M6 (17/10): o nome de um personagem fica a pelo menos 10 px dos outros desenhos, para não parecer o nome do vizinho. O
+ // "Você está aqui" não tem essa margem: no mapa curto do celular ele deixava de caber.
+ figs.forEach(f=>f.on&&taken.push({...f.box,dono:f.n}));
+ const free=(r,dono,pad)=>r.x>=2&&r.y>=2&&r.x+r.w<=a.width-2&&r.y+r.h<=floor-2&&!taken.some(q=>{const g=q.dono&&q.dono!==dono?pad:0;return r.x<q.x+q.w+g&&q.x-g<r.x+r.w&&r.y<q.y+q.h+g&&q.y-g<r.y+r.h;});
+ const place=(el,f,order,pad=10)=>{const w=el.offsetWidth,h=el.offsetHeight,{p,box}=f,mid=box.y+box.h/2-h/2;
+  const spots={below:{x:p.x-w/2,y:box.y+box.h+2},above:{x:p.x-w/2,y:box.y-h-2},right:{x:box.x+box.w+2,y:mid},left:{x:box.x-w-2,y:mid}};
+  const r=f.on&&order.map(s=>({...spots[s],w,h})).find(q=>free(q,f.n,pad));el.style.visibility=r?'':'hidden';if(!r)return;taken.push(r);el.style.transform=`translate(${Math.round(r.x)}px,${Math.round(r.y)}px)`;};
+ place(tags.querySelector('.map-here'),figs[3],['above','left','right','below'],0);
+ figs.forEach(f=>place(tags.querySelector(`[data-name=${f.n}]`),f,['below','above','right','left']));
 }
 function track(key,runs){mapRuns.set(key,[...(mapRuns.get(key)||[]).filter(a=>a.playState==='running'),...runs]);return runs;}
 // Gesto cancelado no meio devolve o personagem ao repouso: nenhum estado fica preso numa pose.
@@ -116,7 +146,7 @@ function onRumoWalk(e){
  if(e.type!=='arrive')return;
  if(mapQuiet||!e.moved&&!e.walked)return;
  const passed=passage?.to===e.index?passage.from:null;
- $('world-live').textContent=(passed===null?'':`Fase ${passed+1} concluída. `)+`Rumo chegou à parada ${e.index+1}, ${STOPS[e.index].place}.`;
+ $('world-live').textContent=(passed===null?'':`Fase ${passed+1} concluída. `)+`Rumo chegou à fase ${e.index+1}, ${STOPS[e.index].place}.`;
  stopRuns('rumo');pose(rumo,'repouso');if(e.stopped)return;
  if(e.walked&&!motionOff()){track('rumo',[body.animate([{transform:from},{transform:'scale(1.08,.92)',offset:.25},{transform:'scale(.97,1.03)',offset:.55},{transform:'scale(1.01,.99)',offset:.8},{transform:'scale(1)'}],{duration:FX.pouso,easing:E.meio})]);dust();}
  else if(motionOff())track('rumo',[body.animate([{opacity:0},{opacity:1}],{duration:FX.fade})]);
@@ -147,33 +177,41 @@ function nodeEffects(b,i,prev,state){
 }
 function think(){const fig=figureOf(STEP_COMPANIONS[lab.step]);if(!fig||fig.dataset.state!=='welcome'||mapRuns.get(fig.dataset.character)?.some(a=>a.playState==='running'))return;fig.dataset.state='thinking';later(()=>{if(fig.dataset.state==='thinking')fig.dataset.state='welcome';},FX.pensar,fig.dataset.character);}
 function paintWorld(){
- const d=worldDomain(),done=d.recorded&&!lab.started,focus=done?6:lab.step,stop=STOPS[focus];
- // Lote 5.5: a linha cabe ao lado do botão de alternativa; o grau sai no celular e "Você está aqui" já está na fila.
- const focusState=shownState(d.steps[focus]);
- $('world-place-zone').innerHTML=`${stop.mark.id} · <span class="place-deg">${stop.mark.deg} · </span>${stop.place}`;
+ const d=worldDomain(),done=d.recorded&&!lab.started,focus=done?6:lab.step,stop=STOPS[focus],data=d.data;
+ // Lote 5.10: o topo da pergunta diz "Fase 4 de 7 · Placa" e, embaixo, a etapa ("Analisar"), com os nomes da fila e do mapa.
+ // O grau da bússola fica só na rota dos Pais.
+ const focusLook=lookOf(d.steps[focus],data);
+ $('world-place-zone').textContent=`Fase ${focus+1} de 7 · ${stop.place}`;$('world-place-stage').textContent=stop.mark.id;
  // Lote 5.7: a barra de passos da fase fica no topo do painel, separada da fila das sete paradas.
  const n=PARTS[focus].length,k=Math.min(part,n-1);
- $('world-place-state').innerHTML=done?'Exercício guardado':`<span class="part-bar" aria-hidden="true">${PARTS[focus].map((_,j)=>`<i${j<=k?' data-on':''}></i>`).join('')}</span><span class="part-text">${n===1?'Passo único':`Passo ${k+1} de ${n}`}</span>`+(focusState==='foco'?'':`<span class="place-state"> · ${STATE_TEXT[focusState]}</span>`);
+ $('world-place-state').innerHTML=done?'Exercício guardado':`<span class="part-bar" aria-hidden="true">${PARTS[focus].map((_,j)=>`<i${j<=k?' data-on':''}></i>`).join('')}</span><span class="part-text">${n===1?'Passo único':`Passo ${k+1} de ${n}`}</span>`+(focusLook==='aqui'?'':`<span class="place-state"> · ${LOOK_TEXT[focusLook]}</span>`);
  $('world-question').hidden=done;$('world-done').hidden=!done;$('world-example').hidden=done;
  // Lote 5.7: com uma fase aberta o mapa fica curto e cresce na passagem; a faixa curta enquadra Rumo e parada (deitado, o
  // enquadramento do 5.6 já cabe). data-stop: no celular em pé, a linha do exemplo fictício fica na primeira parada.
  $('world-stage').toggleAttribute('data-phase',!done);$('world-stage').dataset.stop=focus;syncCompact();
  // Update the stop buttons in place: rebuilding them on a field's blur would swallow the click that caused it.
  const list=$('world-nodes');
- if(list.children.length!==STOPS.length)list.innerHTML=STOPS.map((s,i)=>`<li><button type="button" class="world-node land-${s.mark.land}" data-world-stop="${i}"></button></li>`).join('');
- STOPS.forEach((s,i)=>{const b=list.children[i].firstChild,state=shownState(d.steps[i]),glyph={guardado:'✓',rascunho:'✎',adiado:'↷',bloqueada:LOCK}[state]||String(i+1);
-  const prev=b.dataset.state;b.dataset.state=state;b.toggleAttribute('aria-current',i===focus);if(i===focus)b.setAttribute('aria-current','step');
-  b.setAttribute('aria-label',`${i+1}. ${s.name}, ${s.place}, ${s.mark.id}: ${STATE_TEXT[state]}`);b.title=`${s.mark.id} · ${s.name} · ${STATE_TEXT[state]}`;
-  const key=state==='bloqueada'?'lock':glyph;if(b.dataset.glyph!==key){b.innerHTML=`<span class="node-glyph">${glyph}</span>`;b.dataset.glyph=key;}
+ // Lote 5.10: o nome da parada fica ao lado do círculo (no desktop todos; no tablet em pé, o da atual), com o estado embaixo.
+ if(list.children.length!==STOPS.length)list.innerHTML=STOPS.map((s,i)=>`<li><button type="button" class="world-node land-${s.mark.land}" data-world-stop="${i}"></button><span class="node-name" data-name-of="${i}" aria-hidden="true"><b>${s.place}</b><small></small></span></li>`).join('');
+ STOPS.forEach((s,i)=>{const b=list.children[i].firstChild,state=shownState(d.steps[i]),look=lookOf(d.steps[i],data),glyph=look==='fechada'?LOCK:LOOK_GLYPH[look]||String(i+1);
+  const prev=b.dataset.state;b.dataset.state=state;b.dataset.look=look;b.toggleAttribute('aria-current',i===focus);if(i===focus)b.setAttribute('aria-current','step');
+  b.setAttribute('aria-label',`Fase ${i+1} de 7, ${s.place}: ${LOOK_TEXT[look]}`);b.title=`Fase ${i+1} de 7 · ${s.place} · ${LOOK_TEXT[look]}`;
+  const key=look==='fechada'?'lock':glyph;if(b.dataset.glyph!==key){b.innerHTML=`<span class="node-glyph">${glyph}</span>`;b.dataset.glyph=key;}
+  const name=list.children[i].lastChild;name.dataset.look=look;name.lastChild.textContent=LOOK_TEXT[look];
   if(prev!==state)nodeEffects(b,i,prev,state);});
- worldView?.paintStops(d.steps.map(s=>({state:shownState(s),zone:STOPS[s.index].mark.land})));
+ worldView?.paintStops(d.steps.map(s=>({state:shownState(s),zone:STOPS[s.index].mark.land,glyph:LOOK_GLYPH[lookOf(s,data)]})));
+ // QA B1 (17/10): com o exercício guardado, o rótulo do mapa diz o mesmo estado da fila ("Feita"), não "Você está aqui".
+ const here=mapLayer?.querySelector('.map-here');if(here){here.firstChild.textContent=stop.place;here.lastChild.textContent=done?LOOK_TEXT[focusLook]:LOOK_TEXT.aqui;}if(mapAnchors)layoutTags(mapAnchors);
 }
 function setWorldStatus(text){$('world-status').textContent=text;}
-function goStop(i){
- const d=worldDomain(),s=d.steps[i];if(!s)return;finishPassage();closeMap();worldView?.gust(i);// Lote 5.9: o vento sopra na parada tocada
+function goStop(i,from=null){
+ const d=worldDomain(),s=d.steps[i];if(!s)return;finishPassage();
+ // Lote 5.10: a fase fechada diz, ao lado dela (na fila ou no mapa), por que ainda não abre. O mapa fica como está: no celular,
+ // fechar o mapa aberto levava a parada para fora da tela e o balão apontava para o vazio.
+ if(!s.available&&!(d.recorded&&!lab.started)){worldView?.gust(i);tapRing(i);lockedNote(i,from);return;}
+ closeMap();worldView?.gust(i);// Lote 5.9: o vento sopra na parada tocada
  setWorldStatus(worldFailed||'');tapRing(i);
  if(d.recorded&&!lab.started){worldView?.select(i);return;}
- if(!s.available){setWorldStatus(`${STOPS[i].name} abre depois de ${STOPS[i-1].name}. Responda a pergunta anterior ou deixe-a para depois.`);return;}
  worldAutoStart=false;
  // A parada tocada abre a fase no passo 1, também a parada atual; o Rumo vai até lá sem a passagem de fase.
  if(i!==lab.step){collectLab();const old=lab.step;lab.step=i;labStore();renderLabStep(i<old?-1:1);}else if(part)showPart(0);
@@ -197,22 +235,23 @@ function placeLab(inWorld){
  }
 }
 // worldFailed keeps the message so a click on a stop does not erase why the map is a picture.
-function worldFallback(message){worldFailed=message;worldView?.setActive(false);$('world-viewport').dataset.fallback='true';setWorldStatus(message);$('world-camera').hidden=true;}
+function worldFallback(message){worldFailed=message;worldView?.setActive(false);$('world-viewport').dataset.fallback='true';setWorldStatus(message);$('world-camera').hidden=true;maybeTips();}
 function syncWorld(){
  if(worldCelebrationPending&&(worldCelebrationPending.owner!==owner()||worldCelebrationPending.programa!==programa))worldCelebrationPending=null;
  const visible=current==='trilha'&&programa==='filho';$('bosque').hidden=!visible;placeLab(visible);
  const off=motionOff();if(!visible||off&&!mapWasOff)stopMapMotion();mapWasOff=off;
- if(!visible){closeMap(true);worldView?.setActive(false);return;}
- if(worldFailed)return;
+ if(!visible){closeMap(true);worldView?.setActive(false);if(tipStep>=0){tipStep=-1;closeNote(true);}else closeNote();if(guide.matches(':popover-open'))guide.hidePopover();return;}
+ if(worldFailed){maybeTips();return;}
  if(!worldView){
   if(worldLoading)return;worldLoading=true;
-  const script=document.createElement('script');script.src='media/world/bosque.bundle.js?v=14';
+  const script=document.createElement('script');script.src='media/world/bosque.bundle.js?v=15';
   script.onerror=()=>worldFallback('Não foi possível abrir o 3D. As paradas e as perguntas continuam disponíveis.');
-  script.onload=()=>{try{buildMapLayer();worldView=Bosque.create($('world-viewport'),{onSelect:goStop,onError:worldFallback,onView:paintWorldCamera,onFrame:layoutMap,onWalk:onRumoWalk});window.mapWorld=worldView;measureInsets();$('world-viewport').dataset.ready='true';paintWorld();const done=worldDomain().recorded&&!lab.started;mapQuiet=true;worldView.select(done?6:lab.step,{instant:true});mapQuiet=false;if(done)worldView.camera('center');syncWorld();if(!done)worldView.intro();}catch{worldFallback('Seu navegador não abriu o 3D. Use a lista de paradas.');}};
+  script.onload=()=>{try{buildMapLayer();worldView=Bosque.create($('world-viewport'),{onSelect:goStop,onError:worldFallback,onView:paintWorldCamera,onFrame:layoutMap,onWalk:onRumoWalk});window.mapWorld=worldView;measureInsets();$('world-viewport').dataset.ready='true';paintWorld();const done=worldDomain().recorded&&!lab.started;mapQuiet=true;worldView.select(done?6:lab.step,{instant:true});mapQuiet=false;if(done)worldView.camera('center');syncWorld();if(!done)worldView.intro();maybeTips();}catch{worldFallback('Seu navegador não abriu o 3D. Use a lista de paradas.');}};
   document.head.append(script);return;
  }
  worldView.setActive(true);worldView.setMotion(!motionOff());measureInsets();
  if(worldCelebrationPending)celebrateWorldIfPending();
+ maybeTips();
 }
 window.refreshWorld=syncWorld;
 // Lote 5.6: os botões da câmera ficam sobre a base do mapa; a câmera enquadra paradas e personagens acima deles.
@@ -220,30 +259,41 @@ window.refreshWorld=syncWorld;
 function measureInsets(){
  const vp=$('world-viewport').getBoundingClientRect();if(!worldView||!vp.height)return;
  const tops=[...$('world-camera').querySelectorAll(':scope>button,.world-adjust>summary')].filter(e=>e.checkVisibility()).map(e=>e.getBoundingClientRect()).filter(r=>r.top<vp.bottom&&r.bottom>vp.top).map(r=>r.top);
+ // Lote 5.10: os rótulos do mapa não ficam sob o botão "Dicas", no canto de cima.
+ const g=$('world-guide-open').getBoundingClientRect();guideBox=g.width?{x:g.left-vp.left-4,y:g.top-vp.top-4,w:g.width+8,h:g.height+8}:null;
  worldView.setInsets({bottom:tops.length?Math.max(0,vp.bottom-Math.min(...tops)):0});
 }
 addEventListener('resize',measureInsets);
 function paintWorldCamera(state){
  // Lote 5.8: uma lupa diz o que o botão faz: afastar para ver o bosque inteiro, aproximar para voltar à parada.
- $('world-overview').innerHTML=(state.overview?ZOOM_IN:ZOOM_OUT)+(state.overview?'Voltar à parada':'Ver bosque');
- $('world-explore').setAttribute('aria-pressed',String(!!state.exploring));$('world-explore').innerHTML=state.exploring?'Sair<span class="cam-extra"> da exploração</span>':'Explorar<span class="cam-extra"> mapa</span>';
- const hint='Exploração livre: arraste em qualquer direção e use dois dedos para aproximar. Toque em Sair quando terminar.';
+ // Lote 5.10: cada botão diz o que acontece ao tocar, com o mesmo texto em todo tamanho de tela.
+ $('world-overview').innerHTML=(state.overview?ZOOM_IN:ZOOM_OUT)+(state.overview?'Voltar para onde estou':'Ver a trilha toda');
+ $('world-explore').setAttribute('aria-pressed',String(!!state.exploring));$('world-explore').textContent=state.exploring?'Parar de mover':'Mover o mapa';
+ const hint='Para mover o mapa, arraste em qualquer direção e use dois dedos para aproximar. Toque em Parar de mover quando terminar.';
  if(worldFailed)return;measureInsets();if(state.exploring)setWorldStatus(hint);else if($('world-status').textContent===hint)setWorldStatus('');
 }
 // A vista já mudou quando show('experimento') redesenha a pergunta, antes de o formulário sair do bosque: aí não é o bosque.
 window.addEventListener('lab:step',()=>{if(!worldOwnsForm()||current!=='trilha')return;
  // Lote 5.5: Voltar, Deixar para depois e Continuar ficam presos no rodapé do bloco; a pergunta nova começa do topo.
  const next=$('experiment-next'),skip=$('experiment-fields').querySelector('#lab-skip');next.parentElement.querySelector('#lab-skip')?.remove();
- if(skip){skip.textContent='Deixar para depois';next.before(skip);}
+ if(skip){skip.textContent='Responder depois';skip.title=KEPT;next.before(skip);}
  // Lote 5.7: "Pular" fica no lugar de "Deixar para depois" nos passos opcionais e faz o mesmo caminho de Continuar.
- if(!$('part-skip')){const b=document.createElement('button');b.type='button';b.className='back';b.id='part-skip';b.textContent='Pular';b.onclick=()=>$('experiment-form').requestSubmit();next.before(b);}
+ if(!$('part-skip')){const b=document.createElement('button');b.type='button';b.className='back';b.id='part-skip';b.textContent='Pular esta parte';b.onclick=()=>$('experiment-form').requestSubmit();next.before(b);}
  $('experiment-back').innerHTML=icon('back')+'<span class="back-label">Voltar</span>';
+ // Lote 5.10: o botão de ajuda leva o nome de quem ajuda nesta fase (o guia da terra), no mesmo lugar em toda fase.
+ const g=STEP_COMPANIONS[lab.step];$('lab-help').querySelector('.help-world').lastChild.textContent=`${g==='pipa'?'à':'ao'} ${ELENCO[g].name}`;
  // Passo em que a fase abre: o último ao voltar da fase seguinte, o do rascunho ao entrar na rota, senão o passo 1.
  const from=passing;passing=null;thoughtStep=-1;
  // QA B3: uma fase adiada ou sem o passo 1 respondido reabre pelo passo 1.
  showPart(enterLast&&stepValid()&&!lab.data['skip'+lab.step]?PARTS[lab.step].length-1:worldEntering&&lab.passo?.parada===lab.step?lab.passo.n:0);enterLast=false;
  if(from!==null&&lab.step===from+1&&!worldEntering)passPhase(from);
- else{mapQuiet=worldEntering;worldView?.select(lab.step,{instant:worldEntering});mapQuiet=false;}});
+ else{mapQuiet=worldEntering;worldView?.select(lab.step,{instant:worldEntering});mapQuiet=false;}
+ // Lote 5.10: "Responder depois" confirma que nada se perde; a etapa nova se explica na primeira vez.
+ // QA B5 e M9 (17/10): a segunda frase só quando havia resposta, e o aviso fica 6 s (são até 11 palavras).
+ if(skipped){skipped=false;const had=PARTS[lab.step-1]?.flat().some(n=>filled(lab.data[n]));status('experiment-status',`Fase ${lab.step} deixada para depois.`+(had?` ${KEPT}`:''));$('experiment-status').dataset.hold='';}
+ stageNote();});
+let skipped=false;const KEPT='O que você escreveu fica guardado.';
+document.addEventListener('click',e=>{if(worldOwnsForm()&&e.detail<=1&&e.target.closest('#lab-skip'))skipped=true;},true);
 // Mostra um passo da fase atual: os blocos dos outros passos ficam com data-off (o CSS esconde), mas seguem no formulário.
 function blockOf(name){
  if(name==='firstValue')return $('priority-first');if(name==='sourcePlan')return $('source-followup');// blocos que experiment.js redesenha por dentro
@@ -303,7 +353,7 @@ document.addEventListener('click',e=>{if(!worldOwnsForm()||e.detail>1||!e.target
 // da terra comemora; o painel sobe com a fase seguinte, já desenhada. Tudo em até 1,75 s, nada em laço. Movimento
 // reduzido ou pausa: troca direta, com o texto "Fase concluída". Um toque ou uma tecla pulam (finishPassage).
 function passPhase(from){
- const to=from+1;closeMap(true);
+ const to=from+1;closeMap(true);endTips();closeNote(true);
  if(motionOff()||!worldView||worldFailed||!mapLayer){passage={from,to};worldView?.select(to,{instant:true});passage=null;
   if(!worldView||worldFailed)$('world-live').textContent=`Fase ${from+1} concluída.`;status('experiment-status','Fase concluída.');return;}
  stopCompanionMotion();// a entrada da pergunta nova não roda por trás do mapa
@@ -334,7 +384,7 @@ addEventListener('resize',syncCompact);SIDE.addEventListener('change',()=>{finis
 // QA M1: mensagens da pergunta ficam numa faixa sobre a base da área (CSS), sem empurrar o passo; o que não é erro sai sozinho
 // em 2,5 s, depois de anunciado. O erro fica até a pessoa responder.
 let statusTimer=0;
-new MutationObserver(()=>{const s=$('experiment-status');clearTimeout(statusTimer);if(worldOwnsForm()&&s.textContent&&s.dataset.error!=='true')statusTimer=setTimeout(()=>{if(worldOwnsForm()&&s.dataset.error!=='true')s.textContent='';},2500);}).observe($('experiment-status'),{childList:true,characterData:true,subtree:true});
+new MutationObserver(()=>{const s=$('experiment-status'),ms='hold' in s.dataset?6000:2500;delete s.dataset.hold;clearTimeout(statusTimer);if(worldOwnsForm()&&s.textContent&&s.dataset.error!=='true')statusTimer=setTimeout(()=>{if(worldOwnsForm()&&s.dataset.error!=='true')s.textContent='';},ms);}).observe($('experiment-status'),{childList:true,characterData:true,subtree:true});
 // Lote 5.8: o tablet em pé também. Com a trilha subindo, o bosque inteiro na faixa de 20% ficava menor que no 5.7 (paradas a
 // 68 px, eram 84); com o mapa do tamanho do 5.6 elas voltam a ter espaço.
 const TABLET=matchMedia('(min-width:600px) and (max-width:899px) and (orientation:portrait)');TABLET.addEventListener('change',()=>closeMap(true));// girar fecha, como no celular
@@ -357,7 +407,7 @@ function closePassage(){
  const back=p.el.animate(p.back,{duration:FX.fecha,easing:E.chega,fill:'forwards'});p.anims.push(back);
  back.finished.then(()=>{if(passage===p)endPassage();},()=>{});
 }
-function endPassage(){const p=passage;if(!p)return;passage=null;p.timers?.forEach(clearTimeout);p.anims?.forEach(a=>a.cancel());const st=$('world-stage');delete st.dataset.passage;delete st.dataset.closing;}
+function endPassage(){const p=passage;if(!p)return;passage=null;p.timers?.forEach(clearTimeout);p.anims?.forEach(a=>a.cancel());const st=$('world-stage');delete st.dataset.passage;delete st.dataset.closing;setTimeout(stageNote);}
 // Pular: o Rumo fica na parada nova, o guia volta ao repouso e o painel aparece sem transição.
 function finishPassage(){
  const p=passage;if(!p?.el)return;const st=$('world-stage');
@@ -369,7 +419,7 @@ function finishPassage(){
 // de onde a câmera está (QA A2).
 addEventListener('pointerdown',e=>{if(!e.target.closest?.('#world-camera,#world-viewport canvas'))worldView?.skipIntro();},true);addEventListener('keydown',()=>worldView?.skipIntro(),true);
 // QA B6: tocar numa parada da fila durante a passagem abre essa parada (a fila muda de lugar quando o mapa encolhe).
-addEventListener('pointerdown',e=>{if(!passage?.el)return;const s=e.target.closest?.('[data-world-stop]');finishPassage();if(s)goStop(Number(s.dataset.worldStop));},true);
+addEventListener('pointerdown',e=>{if(!passage?.el)return;const s=e.target.closest?.('[data-world-stop]');finishPassage();if(s)goStop(Number(s.dataset.worldStop),s);},true);
 // QA M2: a tecla que pula a passagem não rola a página (o foco está no título da fase nova).
 addEventListener('keydown',e=>{if(!passage?.el)return;finishPassage();if([' ','Enter','ArrowDown','ArrowUp','PageDown','PageUp','Home','End'].includes(e.key))e.preventDefault();},true);
 // On document, so experiment.js has already collected the field when the map repaints.
@@ -377,7 +427,7 @@ document.addEventListener('input',e=>{if(worldOwnsForm()&&e.target.closest('#exp
  // Pessoa digitando: o guia da terra faz a pose de pensar uma vez por parada.
  if(thoughtStep!==lab.step&&e.target.matches('textarea,input:not([type=radio]):not([type=checkbox])')){thoughtStep=lab.step;think();}}});
 document.addEventListener('change',e=>{if(worldOwnsForm()&&e.target.closest('#experiment-form'))paintWorld();});
-$('world-nodes').onclick=e=>{const button=e.target.closest('[data-world-stop]');if(button)goStop(Number(button.dataset.worldStop));};
+$('world-nodes').onclick=e=>{const name=e.target.closest('[data-name-of]'),button=name?name.previousSibling:e.target.closest('[data-world-stop]');if(button)goStop(Number(button.dataset.worldStop),button);};
 $('world-overview').onclick=()=>{if(!worldView)return;if(mapOpen&&worldView.state().overview){closeMap();return;}openMap();worldView.camera(worldView.state().overview?'focus':'center',{animate:true});};// Lote 5.8: no desktop, com zoom em movimento
 $('world-explore').onclick=()=>{if(!worldView)return;if(mapOpen&&worldView.state().exploring){closeMap();return;}openMap();worldView.setExplore(!worldView.state().exploring);};
 $('world-camera').querySelector('.world-adjust').onclick=e=>{const button=e.target.closest('[data-camera]');if(button)worldView?.camera(button.dataset.camera);};
@@ -408,3 +458,98 @@ document.addEventListener('focusin',e=>{if(!typingField(e.target))return;syncTyp
 document.addEventListener('focusout',e=>{if(!typingField(e.target))return;if(pressing)afterPress(syncTyping);else setTimeout(syncTyping);});
 reduce.addEventListener('change',syncWorld);
 new MutationObserver(syncWorld).observe(document.body,{attributes:true,attributeFilter:['data-motion','data-view']});
+
+// Lote 5.10: balão de fala. O Rumo dá as dicas da primeira visita e explica cada etapa na primeira vez; o personagem tocado diz
+// para que serve; a fase fechada diz por que não abre. Fica na camada de cima (popover), ao lado do elemento real, sem mudar o
+// layout nem a rolagem. Some com "Entendi", com um toque em qualquer lugar (que segue para o que foi tocado) ou com Esc; com
+// movimento reduzido ou pausa, aparece sem animação. Nada volta sozinho: o que já foi visto fica guardado neste navegador
+// (pc-dicas-v1, chave nova) e o botão "Dicas" reabre as dicas e a legenda.
+const SEEN_KEY='pc-dicas-v1',seenNow={};
+const isSeen=k=>!!(read(SEEN_KEY,{})?.[k]||seenNow[k]);
+function markSeen(...keys){keys.forEach(k=>seenNow[k]=true);const v=read(SEEN_KEY,{});write(SEEN_KEY,{...(v&&typeof v==='object'&&!Array.isArray(v)?v:{}),...seenNow});}
+const STAGE_WHY={Mapear:'conhecer possibilidades antes de escolher',Analisar:'reunir informações e ver o que ainda falta saber',Priorizar:'escolher a dúvida que vale investigar primeiro',Agir:'planejar um passo pequeno e testar'};
+const ROLE={rumo:'eu ando com você pela trilha e ajudo na fase da Bifurcação.',bino:'eu ajudo nas fases da Clareira e do Moinho, a reparar no que te dá curiosidade.',
+ pipa:'eu ajudo nas fases da Ponte e da Placa, a comparar possibilidades.',teo:'eu ajudo nas fases do Acampamento e do Mirante, a planejar um passo de cada vez.'};
+const LOOK_HELP={aqui:'A fase aberta agora.',feita:'A parte principal está respondida.',comecada:'Tem resposta, mas falta a parte principal.',depois:`Dá para voltar quando quiser. ${KEPT}`,fechada:'Abre quando você terminar a fase anterior.',aberta:'Ainda sem resposta. O número é a ordem da fase.'};
+const tip=document.createElement('div');tip.id='world-tip';tip.className='world-tip';tip.popover='manual';tip.setAttribute('role','dialog');tip.setAttribute('aria-labelledby','world-tip-text');
+tip.innerHTML='<span class="tip-face" aria-hidden="true"></span><div class="tip-body"><p id="world-tip-text" class="tip-text"></p><div class="tip-foot"><span class="tip-count"></span><button type="button" class="tip-ok">Entendi</button></div></div>';
+$('bosque').append(tip);
+let note=null,tipStep=-1;
+const bosqueOn=()=>current==='trilha'&&programa==='filho'&&!$('bosque').hidden;
+const rectOf=e=>e?.getBoundingClientRect();
+function openNote(n){
+ // Um toque numa fase fechada ou num personagem no meio das dicas encerra as dicas como vistas: a sequência ficava pela metade,
+ // sem balão e sem marcar nada (achado reproduzido em 390×844). "Dicas" reabre.
+ if(n.kind!=='dica'&&tipStep>=0)endTips();
+ closeNote(true);note=n;tip.dataset.kind=n.kind;const face=tip.querySelector('.tip-face');face.hidden=!n.face;face.innerHTML=n.face?companion(n.face,'welcome'):'';
+ tip.querySelector('.tip-text').innerHTML=n.html;tip.querySelector('.tip-count').textContent=n.count||'';tip.querySelector('.tip-foot').hidden=!n.ok;
+ tip.showPopover();placeNote();$('world-live').textContent=tip.querySelector('.tip-text').textContent;
+ if(!motionOff())tip.animate([{opacity:0,translate:'0 6px'},{opacity:1,translate:'0 0'}],{duration:160,easing:E.chega});
+}
+function closeNote(silent=false){const n=note;if(!n)return;note=null;if(tip.matches(':popover-open'))tip.hidePopover();if(!silent)n.onClose?.();}
+// Ao lado do alvo: embaixo ou em cima (na ordem pedida), e por cima dele só se não couber; a ponta aponta para o alvo.
+function placeNote(){
+ if(!note)return;const r=note.target();if(!r||!r.width&&!r.height){closeNote(true);return;}
+ const vw=document.documentElement.clientWidth,vh=innerHeight,b=tip.getBoundingClientRect(),g=14,m=8,ax=note.x?.()??r.left+r.width/2;
+ const spots={below:r.bottom+g,above:r.top-g-b.height},side=(note.prefer||['below','above']).find(s=>spots[s]>=m&&spots[s]+b.height<=vh-m)||'over';
+ const top=side==='over'?Math.max(m,Math.min(vh-m-b.height,r.top+r.height/2-b.height/2)):spots[side],left=Math.max(m,Math.min(vw-m-b.width,ax-b.width/2));
+ tip.style.left=left+'px';tip.style.top=top+'px';tip.dataset.side=side;tip.style.setProperty('--tail',Math.max(22,Math.min(b.width-22,ax-left))+'px');
+}
+addEventListener('resize',placeNote);addEventListener('scroll',placeNote,{passive:true,capture:true});
+// As três dicas: o bosque (pelo Rumo), as fases com a atual e o topo da pergunta, que também explica a etapa.
+const centerX=e=>()=>{const r=rectOf(e());return r.left+r.width/2;};
+const rumoEl=()=>figureOf('rumo')||$('world-viewport'),nodeEl=()=>$('world-nodes').querySelector('[aria-current]')||$('world-nodes'),stageEl=()=>$('world-place-stage');
+function tipList(){
+ const s=STOPS[lab.step].mark.id,list=[
+  // QA M3 (17/10): no mapa curto do celular em pé, a dica 1 fica abaixo do cartão do mapa, e o bosque e a fila ficam à vista.
+  // QA M5: só "fase" para cada parada da trilha na rota do Filho.
+  {html:'Este é o bosque. Eu sou o Rumo e ando com você pela trilha, de uma fase para a outra.',target:()=>shortStrip()?rectOf($('world-viewport').parentElement):rectOf(rumoEl()),x:centerX(rumoEl),prefer:['below','above']},
+  {html:'Estas são as 7 fases. Você está nesta.',target:()=>rectOf(nodeEl()),x:centerX(nodeEl),prefer:['above','below']},
+  {html:`Esta fase é de ${s}: ${STAGE_WHY[s]}. Responda aqui embaixo e toque em Continuar para seguir.`,target:()=>rectOf(stageEl()),x:centerX(stageEl),prefer:['below','above']}];
+ return worldDomain().recorded&&!lab.started?list.slice(0,2):list;// exercício guardado: não há o que responder
+}
+let tipAt=0;// QA M2 (17/10): o balão muda de lugar ao passar a dica, e o segundo toque de um toque duplo caía fora dele
+function showTip(i){const list=tipList();tipStep=i;tipAt=performance.now();openNote({kind:'dica',face:'rumo',ok:true,count:`Dica ${i+1} de ${list.length}`,...list[i]});}
+function nextTip(){if(tipStep<0)return;if(tipStep+1<tipList().length)showTip(tipStep+1);else endTips();}
+function endTips(){if(tipStep<0)return;tipStep=-1;closeNote(true);markSeen('dicas','etapa-'+STOPS[lab.step].mark.id);}
+// Depois da câmera de entrada (5.8), que já mostra o bosque inteiro: as dicas esperam a câmera e o Rumo pararem.
+function whenStill(fn,t0=performance.now()){const s=worldView?.state();if(s&&(s.intro||s.cam||s.hop)&&performance.now()-t0<8000){setTimeout(()=>whenStill(fn,t0),120);return;}fn();}
+function maybeTips(){if(isSeen('dicas')||tipStep>=0||!bosqueOn())return;setTimeout(whenStill,60,()=>{if(!isSeen('dicas')&&tipStep<0&&!note&&bosqueOn()&&!passage?.el)showTip(0);});}
+// A etapa nova (Analisar, Priorizar, Agir) se explica numa frase na primeira vez, depois da passagem de fase.
+function stageNote(){
+ if(!bosqueOn()||tipStep>=0||note||passage?.el||!isSeen('dicas')||worldDomain().recorded&&!lab.started)return;
+ const s=STOPS[lab.step].mark.id;if(isSeen('etapa-'+s))return;
+ openNote({kind:'etapa',face:'rumo',ok:true,html:`Agora começa ${s}: ${STAGE_WHY[s]}.`,target:()=>rectOf(stageEl()),x:centerX(stageEl),prefer:['below','above'],onClose:()=>markSeen('etapa-'+s)});
+}
+function roleNote(name){
+ const fig=figureOf(name);if(!fig)return;
+ openNote({kind:'papel',face:name,html:`<b>${ELENCO[name].name}:</b> ${ROLE[name]}`,target:()=>rectOf(fig),prefer:['above','below']});
+ if(!motionOff()&&!mapRuns.get(name)?.some(a=>a.playState==='running'))track(name,animarGesto(fig,'acolher',1));
+}
+function lockedNote(i,from){
+ const target=from?()=>rectOf(from):()=>{const v=rectOf($('world-viewport')),p=mapAnchors?.stops[i];return p?new DOMRect(v.left+p.x-22,v.top+p.y-44,44,44):v;};
+ openNote({kind:'fechada',html:`<b>Fase ${i+1} de 7 · ${STOPS[i].place}</b> Abre quando você terminar a fase anterior.`,target,prefer:['above','below']});
+}
+// QA M2 (17/10): o segundo clique de um duplo clique (ou toque duplo) em "Entendi" não pula a dica seguinte.
+tip.querySelector('.tip-ok').onclick=e=>{if(e.detail>1)return;if(note?.kind==='dica')nextTip();else closeNote();};
+const shortStrip=()=>!SIDE.matches&&$('world-viewport').getBoundingClientRect().height<200;
+// Um toque em qualquer lugar, menos no "Entendi", passa a dica ou fecha o balão. Os balões só de informação (fase fechada,
+// papel do personagem) não recebem toque: ele segue para o que está embaixo, como o "Ver a trilha toda" no mapa curto do
+// celular, que o balão da fase fechada cobria (achado da suíte rota-uma-tela, A2 em 360×660).
+addEventListener('pointerdown',e=>{if(!note||e.target.closest?.('.tip-ok'))return;if(note.kind==='dica'){if(performance.now()-tipAt>400)nextTip();}else closeNote();},true);
+addEventListener('keydown',e=>{if(e.key!=='Escape'||!note)return;if(note.kind==='dica')endTips();else closeNote();});
+// Legenda: os estados com o mesmo símbolo e o mesmo nome da fila e do mapa, as etapas e quem é quem; e as dicas de novo.
+const guide=$('world-guide');
+function paintGuide(){
+ const sample=l=>`<span class="world-node" data-look="${l}" aria-hidden="true"><span class="node-glyph">${l==='fechada'?LOCK:LOOK_GLYPH[l]||(l==='aqui'?'1':'2')}</span></span>`;
+ // QA M8 (17/10): "Fechar" fica preso no topo da legenda, à vista sem rolar. QA M10: a cor de cada etapa ao lado do nome, a
+ // mesma da borda das fases na fila.
+ guide.innerHTML=`<div class="guide-head"><h2 id="world-guide-title">Como ler a trilha</h2><button type="button" class="back" id="guide-close">Fechar</button></div><ul class="guide-looks">${Object.keys(LOOK_TEXT).map(l=>`<li>${sample(l)}<span><b>${LOOK_TEXT[l]}</b><small>${LOOK_HELP[l]}</small></span></li>`).join('')}</ul>`+
+  `<h3>As 4 etapas</h3><p class="guide-note">A borda de cada fase na fila tem a cor da etapa dela.</p><ul class="guide-stages">${MARCAS.map(m=>`<li><span class="stage-dot land-${m.land}" aria-hidden="true"></span><span><b>${m.id}:</b> ${STAGE_WHY[m.id]}.</span></li>`).join('')}</ul>`+
+  `<h3>Quem é quem</h3><ul class="guide-cast">${['rumo','bino','pipa','teo'].map(n=>`<li><span class="tip-face" aria-hidden="true">${companion(n,'welcome')}</span><span><b>${ELENCO[n].name}:</b> ${ROLE[n]}</span></li>`).join('')}</ul>`+
+  '<div class="guide-actions"><button type="button" class="btn" id="guide-tips">Ver as dicas de novo</button></div>';
+}
+guide.addEventListener('beforetoggle',e=>{if(e.newState!=='open')return;endTips();closeNote(true);paintGuide();});
+guide.addEventListener('toggle',e=>{if(e.newState!=='open')return;const b=rectOf($('world-guide-open')),g=guide.getBoundingClientRect(),m=8,vw=document.documentElement.clientWidth;
+ guide.style.left=Math.max(m,Math.min(vw-m-g.width,b.left))+'px';guide.style.top=Math.max(m,Math.min(innerHeight-m-g.height,b.bottom+8))+'px';});
+guide.addEventListener('click',e=>{if(e.target.closest('#guide-close'))guide.hidePopover();if(e.target.closest('#guide-tips')){guide.hidePopover();showTip(0);}});
