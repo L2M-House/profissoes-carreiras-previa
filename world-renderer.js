@@ -414,6 +414,22 @@ void RE_IndirectDiffuse_Lambert(const in vec3 irradiance,const in vec3 geometryP
  // holds the stop he leaves (QA A3: at half the walk it had left). A tap on a stop sends a gust there.
  function wake(to,from){if(!motion||!running())return;birdAge[to*2]=0;birdAge[to*2+1]=-.15;if(to>=5)fireAge=0;if(from===0){bloomAge=0;U.uBloom.value.set(stops[from].x,stops[from].z,1,0);}}
  function gust(i){const s=stops[i];if(!s||!motion||!running())return;gustAge=0;U.uGust.value.set(s.x,s.z,1.6,0);ambient=0;schedule();}
+ // Lote 5.11: when a phase ends, one burst of confetti over Rumo at the new stop: 80 flat pieces in the colors of the kit for 1 s,
+ // thrown up and falling with drag, no loop, created and disposed in each passage (one draw call while it lasts). Unlit, with the
+ // same color on both faces, a piece that turns never flashes; it turns less than once a second and shrinks in the last 0.25 s.
+ // The plane and the material stay (the shader is compiled once, at load: compiling it on arrival cost a 48 ms frame on a slow
+ // phone); each burst creates its own instances and disposes of them.
+ const BURST=1,PIECES=80,KIT=[colors.coral,colors.sun,colors.leaf2,'#ffb4a8',colors.ivory],burstGeo=new T.PlaneGeometry(.18,.12),burstMat=new T.MeshBasicMaterial({side:T.DoubleSide,toneMapped:false,fog:false});let burst=null;
+ function confetti(i){endBurst();const s=stops[i];if(!s||!motion||!running())return false;
+  const mesh=new T.InstancedMesh(burstGeo,burstMat,PIECES),col=new T.Color();mesh.name='confete';mesh.frustumCulled=false;
+  const p=Array.from({length:PIECES},(_,k)=>{mesh.setColorAt(k,col.set(KIT[k%KIT.length]));const a=k*2.39996,r=.35+.65*hash(k,1);return [Math.cos(a)*r*3.6,1.6+1.6*hash(k,2),Math.sin(a)*r*3.6,hash(k,3)*6,1.6+3.4*hash(k,4)];});
+  // QA M2: it bursts just above the "you are here" label and opens wide, then falls beside Rumo; from his head, the drawing and the
+  // label (SVG, over the canvas) hid every piece on a phone.
+  burst={mesh,p,t:0,at:[s.x,s.y+2.3,s.z]};stepBurst(0);scene.add(mesh);schedule();return true;}
+ function stepBurst(dt){const b=burst;b.t+=dt;if(b.t>=BURST){endBurst();return;}const t=b.t,[x,y,z]=b.at,drag=(1-Math.exp(-2.4*t))/2.4,k=Math.min(1,(BURST-t)/.25);
+  b.p.forEach(([vx,vy,vz,ph,w],j)=>{body.position.set(x+vx*drag,y+vy*drag-2.2*t*t,z+vz*drag);body.scale.setScalar(k);body.rotation.set(ph+w*t,ph*.7+w*.6*t,w*.3*t);body.updateMatrix();b.mesh.setMatrixAt(j,body.matrix);});
+  b.mesh.instanceMatrix.needsUpdate=true;metrics.maxConfetti=Math.max(metrics.maxConfetti,b.p.length);}
+ function endBurst(){if(!burst)return;scene.remove(burst.mesh);burst.mesh.dispose();burst=null;}
  // Pause, reduced motion or leaving the view: birds back on their perch, the fish and the flock away, no gust, flare or bloom.
  function settleLife(){birdAge.forEach((a,i)=>{if(a!==null){birdAge[i]=null;perchBird(i);}});gustAge=fireAge=bloomAge=9;U.uGust.value.z=0;U.uBloom.value.z=0;flock=-1;fishAge=null;updateLife();hide(critters,8);fishOn=false;for(let j=0;j<7;j++)hide(critters,9+j);critters.instanceMatrix.needsUpdate=true;}
  perches.forEach((_,i)=>perchBird(i));for(let j=8;j<PERCHED;j++)hide(critters,j);updateLife();
@@ -454,7 +470,7 @@ void RE_IndirectDiffuse_Lambert(const in vec3 irradiance,const in vec3 geometryP
  const center=new T.Vector3(0,0,0);let angle=A0,zoom=1,lost=false,disposed=false,overview=true,exploring=false,framed=true,insetBottom=0,compact=false,shortNow=false,closeNow=false,keepGuide=null,intro=null,lastHalf=0;
  // Lote 5.9: maxLife = instances written on the CPU in one frame; cpu = time of advance() (ambient, camera and the draw call
  // submission), the reference for a frame on the CPU.
- const metrics={maxCalls:0,maxTriangles:0,maxLife:0,cpuMax:0,cpuSum:0,cpuN:0};
+ const metrics={maxCalls:0,maxTriangles:0,maxLife:0,maxConfetti:0,cpuMax:0,cpuSum:0,cpuN:0};
  function goTo(u){pieceU=u;piecePos.copy(curve.getPointAt(u));}
  // Camera basis at the current angle: screen right (horizontal), screen up, and toward the camera on the ground. The camera
  // sits 10 above the ground and 10 away, looking at y = .45, so it looks down at 43.7°, not 45°: SP and CP are its sine and
@@ -528,10 +544,10 @@ void RE_IndirectDiffuse_Lambert(const in vec3 irradiance,const in vec3 geometryP
   return all.half<=room?all:fit(core,1.6,Math.max(1.6,room),wide?20:6);}
  let focusHalf=2.6,overviewHalf=6;
  function reframe(){const o=frameOverview(),f=frameFocus(selected);overviewHalf=o.half;focusHalf=f.half;if(!framed)return;if(overview)center.copy(centerAt(o.cx,o.cy));else{aim=f.center;if(!cam&&!walk)center.copy(f.center);}}
- function settle(){settleLife();if(cam){center.copy(cam.to);cam=null;}if(intro){intro=null;overview=false;const f=frameFocus(selected);focusHalf=f.half;aim=f.center;center.copy(f.center);}if(walk){goTo(walk.to);const index=walk.index;walk=null;if(aim)center.copy(aim);render();onWalk({type:'arrive',index,walked:false,moved:true,stopped:true});}}
+ function settle(){settleLife();endBurst();if(cam){center.copy(cam.to);cam=null;}if(intro){intro=null;overview=false;const f=frameFocus(selected);focusHalf=f.half;aim=f.center;center.copy(f.center);}if(walk){goTo(walk.to);const index=walk.index;walk=null;if(aim)center.copy(aim);render();onWalk({type:'arrive',index,walked:false,moved:true,stopped:true});}}
  function stop(){cancelAnimationFrame(raf);raf=0;last=0;}
  const running=()=>!disposed&&!lost&&activeScene&&visible&&motion&&!document.hidden;
- const busy=()=>walk||cam||intro||ambient<12;
+ const busy=()=>walk||cam||intro||burst||ambient<12;
  // Screen points for the SVG layer, in CSS pixels of the canvas; unit = pixels per world unit at the current zoom.
  const toScreen=(v,rect)=>{const p=v.clone().project(camera);return {x:(p.x+1)/2*rect.width,y:(1-p.y)/2*rect.height,z:p.z};};
  function anchors(rect=host.getBoundingClientRect()){return {width:rect.width,height:rect.height,unit:rect.height/(camera.top-camera.bottom),figMax:figMax(),short:shortNow,close:closeNow&&(!overview||!!cam),inset:insetBottom,rumo:toScreen(piecePos,rect),
@@ -603,6 +619,7 @@ void RE_IndirectDiffuse_Lambert(const in vec3 irradiance,const in vec3 geometryP
  function paintStops(next){states=next.map((s,i)=>({...states[i],...s}));for(const s of stops){const st=states[s.index];drawBadge(s,st);markers.ring.setColorAt(s.index,ringColor.set(st.state==='foco'?colors.sun:ZONES[st.zone]||colors.ivory));markers.flag.setColorAt(s.index,flagColor.set(st.state==='guardado'?colors.sun:ZONES[st.zone]||colors.coral));const down=st.state==='bloqueada';s.flag.position.y=down?.62:1.12;s.flag.scale.x=down?.55:1;}markers.ring.instanceColor.needsUpdate=true;markers.flag.instanceColor.needsUpdate=true;render();}
  function advance(dt){
   if(!running())return;const c0=performance.now(),ambientDt=Math.min(dt,12-ambient);ambient+=ambientDt;ambientPhase+=ambientDt;if(ambientDt>0)lifeStep(ambientDt);
+  if(burst)stepBurst(dt);
   const following=!!walk;
   if(walk){walk.t=Math.min(walk.dur,walk.t+dt);
    if(walk.t>0){if(!walk.running){walk.running=true;onWalk({type:'run',index:walk.index,dir:walk.dir,run:walk.dur*1000});}
@@ -644,6 +661,7 @@ void RE_IndirectDiffuse_Lambert(const in vec3 irradiance,const in vec3 geometryP
  // Scrolling the scene away or hiding the tab ends a walk at its stop instead of freezing it halfway (QA M4).
  const resizeObserver=new ResizeObserver(resize);resizeObserver.observe(host);const observer=new IntersectionObserver(es=>{visible=es[0].isIntersecting;if(!visible){stop();settle();}else schedule()});observer.observe(host);const visibility=()=>{if(document.hidden){stop();settle();}else schedule()};document.addEventListener('visibilitychange',visibility);
  stops.forEach(s=>drawBadge(s,states[s.index]));resize();
+ {const warm=new T.Scene(),m=new T.InstancedMesh(burstGeo,burstMat,1);m.setColorAt(0,new T.Color());warm.add(m);renderer.compile(warm,camera);m.dispose();}// Lote 5.11: the confetti shader, ready before the first phase ends
  return {select,paintStops,advance,render,anchors,camera:cameraAction,setExplore,
   // The camera controls drawn over the bottom of the strip (px): the frame keeps stops and characters above them.
   setInsets({bottom=0}={}){if(Math.abs(bottom-insetBottom)<1)return;insetBottom=bottom;reframe();render();},
@@ -655,13 +673,15 @@ void RE_IndirectDiffuse_Lambert(const in vec3 irradiance,const in vec3 geometryP
   intro({hold=1.6,dur=1.3}={}){if(rectOf().width<900||!motion||!running())return false;const o=frameOverview();overview=true;overviewHalf=o.half;center.copy(centerAt(o.cx,o.cy));intro={t:-hold,dur,go:false};render();view();schedule();return true;},
   skipIntro:()=>endIntro(true),
   // Lote 5.9: a tap on a stop sends a gust there; with a text field in focus the scene goes calm (wind 15%, critters slower).
+  // Lote 5.11: the confetti of a finished phase; a tap that skips the passage ends it at once.
+  confetti,endConfetti(){if(!burst)return;endBurst();render();},
   gust,setCalm(value){if(calm===!!value)return;calm=!!value;if(ambient<12)schedule();},
   // The passage ends: the guide of the finished land no longer holds the frame.
   setKeep(name=null){if(keepGuide===name)return;const from=center.clone(),h0=lastHalf;keepGuide=name;reframe();
    if(rectOf().width>=900&&motion&&running()&&!overview&&h0&&!walk){cam={from,to:center.clone(),t:0,dur:.3,ease:smooth,h0,h1:focusHalf};center.copy(from);schedule();}render();},
   setMotion(value){motion=value;if(!value){stop();settle();endIntro();render();}else schedule();},setManual(value){manual=value;stop();if(!value)schedule();},
-  state:()=>({ready:true,compact,short:shortNow,close:closeNow,intro:!!intro,selected,piece:piecePos.toArray(),stopPositions:stops.map(s=>[s.x,s.z]),stopHeights:stops.map(s=>s.y),states:states.map(s=>s.state),hop:!!walk,cam:!!cam,frames,active:activeScene,visible,motion,lost,tiles:tiles.length,heights:[...new Set(tiles.map(t=>t.height))],zoom,angle,center:center.toArray(),overview,exploring,ambient,tilt:tilt.on,metrics:{...metrics},life:{t:lifeT,live,amp:U.uAmp.value,calm,gust:U.uGust.value.z,fire:boost(),bloom:U.uBloom.value.z,birdsAway:birdAge.filter(a=>a!==null).length,flock:flock>=0,fish:fishOn,wheel:wheelSpeed},triangles:renderer.info.render.triangles,calls:renderer.info.render.calls}),
+  state:()=>({ready:true,confetti:burst?burst.p.length:0,compact,short:shortNow,close:closeNow,intro:!!intro,selected,piece:piecePos.toArray(),stopPositions:stops.map(s=>[s.x,s.z]),stopHeights:stops.map(s=>s.y),states:states.map(s=>s.state),hop:!!walk,cam:!!cam,frames,active:activeScene,visible,motion,lost,tiles:tiles.length,heights:[...new Set(tiles.map(t=>t.height))],zoom,angle,center:center.toArray(),overview,exploring,ambient,tilt:tilt.on,metrics:{...metrics},life:{t:lifeT,live,amp:U.uAmp.value,calm,gust:U.uGust.value.z,fire:boost(),bloom:U.uBloom.value.z,birdsAway:birdAge.filter(a=>a!==null).length,flock:flock>=0,fish:fishOn,wheel:wheelSpeed},triangles:renderer.info.render.triangles,calls:renderer.info.render.calls}),
   raw:()=>({renderer,scene,camera,piece,stops,targets,curve,trail,wheel,stream,flags,guides,landmarks,markBox,millBox,scenery,tilt,life:{uniforms:U,critters,puffs,clouds,flames,blades,perches,lanterns,reeds,blobs,glow},field:FIELD,toTrail:ST}),
-  dispose(){disposed=true;stop();resizeObserver.disconnect();observer.disconnect();document.removeEventListener('visibilitychange',visibility);release(scene);release(tilt.scene);tilt.tex?.dispose();renderer.dispose();canvas.remove();}
+  dispose(){disposed=true;stop();endBurst();burstGeo.dispose();burstMat.dispose();resizeObserver.disconnect();observer.disconnect();document.removeEventListener('visibilitychange',visibility);release(scene);release(tilt.scene);tilt.tex?.dispose();renderer.dispose();canvas.remove();}
  };
 }};

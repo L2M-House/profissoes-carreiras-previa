@@ -39,15 +39,15 @@ function show(id,{replace=false,focus=true,fromHistory=false}={}){
  if(!VIEWS.includes(id))id='inicio';
  if(id==='aula'&&session()?.papel!=='anai')id='entrar';
  if((id==='licao'&&!aberta)||(id==='pronta'&&!saved))id='trilha';
- stopCompanionMotion();if($("helper-dialog").open)$("helper-dialog").close();current=id;document.body.dataset.view=id;
+ stopCompanionMotion();if($("helper-dialog").open)$("helper-dialog").close();if($('trail-done').open)$('trail-done').close();current=id;document.body.dataset.view=id;
  VIEWS.forEach(v=>$(v).hidden=v!==id);
  if(id==='trilha')renderCourse();
  if(id==='painel')paintPainel();
  if(id==='aula')renderAulas();
  if(id==='licao')paintLesson();
  if(id==='experimento')renderExperiment();
- if(id==='pronta'){ $('stat-rumos').textContent=rumos();$('stat-rumos-label').textContent=rumos()===1?'registro guardado':'registros guardados';playDone(); }
- else{$('celebra').pause();$('celebra').classList.remove('playing');}
+ // Lote 5.11: o vídeo do Rumo antigo saiu da tela (decisão 5); quem comemora é o Rumo do elenco, aqui e na tela cheia do bosque.
+ if(id==='pronta'){ $('stat-rumos').textContent=rumos();$('stat-rumos-label').textContent=rumos()===1?'registro guardado':'registros guardados'; }
  document.querySelectorAll('nav [data-go]').forEach(b=>{if(b.dataset.go===id)b.setAttribute('aria-current','page');else b.removeAttribute('aria-current');});
  const heading=$(id).querySelector('h1');document.title=`${heading?.textContent||'MAPA'} · Anaí Auada`;
  if(!fromHistory){history[replace?'replaceState':'pushState'](context(),'',replace&&id==='inicio'&&!location.hash?location.href:`#${id}`);}
@@ -72,7 +72,6 @@ function saveAnswer(data){let previous;try{previous=JSON.parse(localStorage.getI
 function renderAulas(){$('aula-list').innerHTML=aulas().map(a=>`<li><div><strong>${esc(a.nome)}</strong><small>${esc(a.etapa)} · ${a.programa==='pais'?'Pais':'Filho'}</small></div><button type="button" class="back" data-edit="${esc(a.id)}">Editar</button><button type="button" class="back" data-delete="${esc(a.id)}">Excluir</button></li>`).join('')||'<li>Nenhuma aula guardada.</li>';}
 const reduce=matchMedia('(prefers-reduced-motion: reduce)');
 function motionOff(){return reduce.matches||document.body.dataset.motion==='paused';}
-function playDone(){const v=$('celebra');if(motionOff())return;v.onloadeddata=()=>{if(current==='pronta'&&!motionOff())v.play().then(()=>v.classList.add('playing')).catch(()=>{});};if(v.readyState>=2){v.currentTime=0;v.onloadeddata();}else v.load();}
 document.querySelector('.skip').onclick=e=>{e.preventDefault();$('conteudo').focus();window.scrollTo({top:0,behavior:'instant'});};
 document.body.addEventListener('click',e=>{
  const go=e.target.closest('[data-go]');if(go){e.preventDefault();if(go.dataset.programa)setPrograma(go.dataset.programa);if(go.dataset.marca)selectedMark=go.dataset.marca;show(go.dataset.go);if(go.dataset.programa==='filho'&&go.dataset.go==='trilha')offerAvatar();return;}
@@ -91,8 +90,7 @@ $('form-entrar').onchange=()=>{$('login-submit').innerHTML=`Entrar como ${new Fo
 $('form-entrar').onsubmit=e=>{e.preventDefault();const data=new FormData(e.currentTarget);const nome=String(data.get('nome')||'').trim()||String(data.get('email')).split('@')[0];if(!write(SES,{nome,papel:data.get('papel')},sessionStorage)){status('login-status','O navegador bloqueou a gravação. Você ainda pode explorar a rota sem entrar.',true);return;}e.currentTarget.reset();paintSession();show('painel');};
 $('sair').onclick=()=>{try{sessionStorage.removeItem(SES);}catch{status('login-status','Não foi possível sair. A gravação está bloqueada.',true);show('entrar');return;}paintSession();show('inicio');};
 $('form-aula').onsubmit=e=>{e.preventDefault();if(session()?.papel!=='anai')return;const nome=$('aula-nome').value.trim(),texto=$('aula-texto').value.trim();if(!nome||!texto){status('aula-status','Preencha o título e a pergunta.',true);return;}const id=$('aula-id').value||crypto.randomUUID();const items=aulas();const a={id,nome,texto,etapa:$('aula-etapa').value,programa:$('aula-programa').value};const index=items.findIndex(a=>a.id===id);if(index>=0)items[index]=a;else items.push(a);if(!write(KEY,items)){status('aula-status','Não foi possível guardar. Os campos continuam preenchidos.',true);return;}e.currentTarget.reset();$('aula-id').value='';$('aula-titulo').textContent='Nova aula';status('aula-status','Aula guardada na rota.');renderAulas();};
-$('motion-toggle').onclick=()=>{const paused=document.body.dataset.motion!=='paused';document.body.dataset.motion=paused?'paused':'active';$('motion-toggle').setAttribute('aria-pressed',paused);$('motion-label').textContent=paused?'Retomar animações':'Pausar animações';if(paused){$('celebra').pause();$('celebra').classList.remove('playing');}};
-reduce.addEventListener('change',()=>{if(reduce.matches){$('celebra').pause();$('celebra').classList.remove('playing');}});
+$('motion-toggle').onclick=()=>{const paused=document.body.dataset.motion!=='paused';document.body.dataset.motion=paused?'paused':'active';$('motion-toggle').setAttribute('aria-pressed',paused);$('motion-label').textContent=paused?'Retomar animações':'Pausar animações';};
 function restore(state){if(state){programa=state.programa==='filho'?'filho':'pais';selectedMark=MARCAS.some(m=>m.id===state.selectedMark)?state.selectedMark:'Analisar';aberta=state.lesson||null;saved=!!state.receipt;}show(location.hash.slice(1)||'inicio',{fromHistory:true});}
 window.addEventListener('popstate',e=>restore(e.state));
 window.addEventListener('hashchange',()=>{if(location.hash!==`#${current}`)show(location.hash.slice(1),{replace:true});});

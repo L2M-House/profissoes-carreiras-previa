@@ -19,7 +19,7 @@ nav{display:flex;gap:4px;align-items:center;margin-left:auto}nav button{min-heig
 .dock{background:var(--white);border:var(--border) solid var(--line);border-radius:var(--radius-panel);padding:24px;min-width:0;border-top:6px solid var(--stage);animation:dock-in var(--standard) var(--ease) both}.dock-heading{display:flex;align-items:center;justify-content:space-between;gap:12px;margin:-8px 0 16px}.dock-bearing{font-size:16px;font-weight:900;padding:8px 12px;border:var(--border) solid var(--line);border-radius:var(--radius-round)}.dock h2{font-size:26px;line-height:1.15;margin-bottom:12px}.dock>p:not(.eyebrow){font-size:14px;color:var(--muted)}.dock-note{border-top:var(--border) solid var(--line);padding-top:16px;margin-top:16px}.dock .btn{width:100%;font-size:14px;padding:12px 14px;margin:12px 0 16px}.chip{display:flex;align-items:center;gap:10px;width:100%;min-height:48px;padding:12px;margin:8px 0;text-align:left;background:var(--cream);border:var(--border) solid var(--line);border-radius:var(--radius-control);font-size:13px;font-weight:900}.chip .icon{width:17px;height:17px}
 .split{display:grid;grid-template-columns:1.05fr .95fr;gap:32px;align-items:start}.split>.sheet{border:var(--border) solid var(--line);border-radius:var(--radius-panel);padding:28px}.split>div>h2{font-size:24px}.aula-list{list-style:none;margin:0;padding:0;display:grid;gap:12px}.aula-list li{display:grid;gap:8px;padding:20px;border:var(--border) solid var(--line);border-left:6px solid var(--stage,var(--coral));border-radius:var(--radius-control);background:var(--white);overflow-wrap:anywhere}.aula-list small{color:var(--muted);font-size:13px}.row-btns{display:flex;gap:12px;flex-wrap:wrap}.row-btns button{min-height:44px;padding:8px 14px;border:var(--border) solid var(--line);border-radius:12px;background:var(--cream);font-size:13px;font-weight:900;box-shadow:0 2px 0 var(--line-deep)}.row-btns button:active{transform:translateY(2px);box-shadow:none}
 .lesson-layout{max-width:760px;margin:0 auto}.lesson-top{display:flex;align-items:center;justify-content:space-between;gap:16px;margin-bottom:24px}.lesson-program{font-size:12px;color:var(--muted);text-align:right}.lesson{background:var(--white);padding:36px 40px;border:var(--border) solid var(--line);border-top:6px solid var(--stage,var(--coral));border-radius:var(--radius-panel);box-shadow:var(--shadow);position:relative}.lesson-heading{display:flex;align-items:center;gap:16px;margin-bottom:16px}.lesson-heading img{width:64px;height:64px;margin-left:-8px}.lesson-heading .eyebrow{margin:0}.lesson h1{font-size:34px;line-height:1.2}.lesson .lead{font-size:17px;line-height:1.65;max-width:none;white-space:pre-wrap;overflow-wrap:anywhere}.lesson-preview{display:flex;align-items:start;gap:10px;padding:14px;border-radius:var(--radius-control);background:var(--cream);margin:20px 0 24px;font-size:13px}.lesson-preview .icon{width:18px;height:18px;margin-top:2px}.lesson-preview p{margin:0}.write{margin:24px 0 10px}.write>span{font-size:14px}.write textarea{min-height:190px;font-size:17px;padding:16px;line-height:1.7;background:var(--white)}.lesson .status{margin-top:12px}.lesson-actions{display:flex;align-items:center;justify-content:space-between;gap:20px;margin-top:28px;border-top:var(--border) solid var(--line);padding-top:24px}.local-save{display:flex;gap:6px;align-items:center;font-size:11px;color:var(--muted)}.local-save .icon{width:15px;height:15px}.lesson-footnote{font-size:12px;color:var(--muted);text-align:center;margin-top:24px}
-.done{max-width:560px;margin:0 auto;text-align:center;padding:12px 0}.done>.eyebrow{justify-content:center}.done-stage{position:relative;width:260px;height:260px;margin:16px auto 24px;display:grid;place-items:center;background:var(--white);border-radius:50%;border:var(--border) dashed var(--line-deep)}#done-rumo{width:230px}.done-stage video{position:absolute;inset:0;width:100%;height:100%;object-fit:cover;border-radius:50%;display:none}.done-stage.playing video{display:block}.done-stage.playing #done-rumo{visibility:hidden}.done-seal{position:absolute;bottom:4px;right:0;width:52px;height:52px;display:grid;place-items:center;background:var(--leaf);border:4px solid var(--cream);border-radius:50%;color:var(--ink);animation:seal-in 500ms var(--bounce) both}.done-seal .icon{width:26px;height:26px;stroke-width:3}.done h1{font-size:44px;margin-bottom:16px}.done .lead{font-size:18px;margin:0 auto 12px;overflow-wrap:anywhere}.done-note{font-size:14px;color:var(--muted);margin-bottom:24px}.done-receipt{display:flex;align-items:center;gap:16px;padding:20px;text-align:left;background:var(--white);border:var(--border) solid var(--line);border-radius:var(--radius-control);margin-bottom:24px}.done-receipt>div{display:flex;gap:6px;align-items:baseline;flex-wrap:wrap;font-size:13px}.done-receipt strong{font-size:24px;font-weight:900}.done-receipt>span:last-child{margin-left:auto;color:var(--muted);font-size:11px;flex:none}.done>.btn{width:100%}.done>.back{margin-top:20px;border-color:transparent;background:transparent;box-shadow:none}
+.done{max-width:560px;margin:0 auto;text-align:center;padding:12px 0}.done>.eyebrow{justify-content:center}.done-stage{position:relative;width:260px;height:260px;margin:16px auto 24px;display:grid;place-items:center;background:var(--white);border-radius:50%;border:var(--border) dashed var(--line-deep)}#done-rumo{width:230px}.done-seal{position:absolute;bottom:4px;right:0;width:52px;height:52px;display:grid;place-items:center;background:var(--leaf);border:4px solid var(--cream);border-radius:50%;color:var(--ink);animation:seal-in 500ms var(--bounce) both}.done-seal .icon{width:26px;height:26px;stroke-width:3}.done h1{font-size:44px;margin-bottom:16px}.done .lead{font-size:18px;margin:0 auto 12px;overflow-wrap:anywhere}.done-note{font-size:14px;color:var(--muted);margin-bottom:24px}.done-receipt{display:flex;align-items:center;gap:16px;padding:20px;text-align:left;background:var(--white);border:var(--border) solid var(--line);border-radius:var(--radius-control);margin-bottom:24px}.done-receipt>div{display:flex;gap:6px;align-items:baseline;flex-wrap:wrap;font-size:13px}.done-receipt strong{font-size:24px;font-weight:900}.done-receipt>span:last-child{margin-left:auto;color:var(--muted);font-size:11px;flex:none}.done>.btn{width:100%}.done>.back{margin-top:20px;border-color:transparent;background:transparent;box-shadow:none}
 footer{display:flex;align-items:center;justify-content:space-between;gap:24px;padding:28px max(24px,calc((100% - 1136px)/2));border-top:var(--border) solid var(--line)}footer .brand strong{font-size:13px}footer .brand small{font-size:11px}footer p{font-size:11px;margin:0;color:var(--muted)}.motion-toggle{display:flex;gap:6px;align-items:center;min-height:44px;padding:8px 12px;background:transparent;border:var(--border) solid var(--line);border-radius:12px;font-size:11px;color:var(--muted)}.motion-toggle .icon{width:14px;height:14px}.noscript{padding:24px;text-align:center;background:var(--sun)}
 .rumo{display:block;width:100%;height:auto;overflow:visible}.bob{transform-origin:120px 210px;animation:rumo-float 3s ease-in-out 3}.needle{transform-origin:120px 78px;animation:needle-look 3s ease-in-out 3}.eyes{transform-origin:120px 128px;animation:eyes-blink 4.2s ease-in-out 3}.arm-r{transform-origin:182px 124px}.pose-wave .arm-r{animation:wave 1.2s var(--ease) 2}.star{transform-origin:center;transform-box:fill-box;animation:twinkle 3s ease-in-out 3}.star-b{animation-delay:240ms}.star-c{animation-delay:480ms}.pose-celebrate .bob{animation:celebrate 700ms var(--bounce) both}.pose-celebrate .arm-l{transform-origin:56px 124px;transform:rotate(40deg)}.pose-celebrate .arm-r{transform:rotate(-40deg)}body[data-motion="paused"] *,body[data-motion="paused"] *:before,body[data-motion="paused"] *:after{animation:none!important;transition:none!important}
 @keyframes view-in{from{opacity:0;transform:translateY(10px)}to{opacity:1;transform:none}}@keyframes dock-in{from{opacity:.5;transform:translateY(6px)}to{opacity:1;transform:none}}@keyframes label-in{from{opacity:0;transform:translateY(8px) rotate(-6deg) scale(.94)}to{opacity:1;transform:rotate(-4deg)}}@keyframes rumo-float{0%,100%{transform:translateY(0) rotate(0)}50%{transform:translateY(-6px) rotate(2deg)}}@keyframes needle-look{0%,100%{transform:rotate(-8deg)}45%,65%{transform:rotate(10deg)}}@keyframes eyes-blink{0%,43%,48%,100%{transform:scaleY(1)}45%,46%{transform:scaleY(.08)}}@keyframes wave{0%,100%{transform:rotate(0)}25%,65%{transform:rotate(-25deg)}45%,85%{transform:rotate(-8deg)}}@keyframes twinkle{0%,100%{transform:scale(.85)}50%{transform:scale(1.05) rotate(10deg)}}@keyframes celebrate{0%{transform:translateY(0) scale(1.05,.95)}40%{transform:translateY(-18px) scale(.98,1.02)}75%{transform:translateY(0) scale(1.03,.97)}100%{transform:none}}@keyframes seal-in{0%{transform:scale(.7) rotate(-15deg);opacity:0}100%{transform:none;opacity:1}}
@@ -196,7 +196,6 @@ html:has(#bosque:not([hidden])){scroll-padding-top:var(--top-h,78px)}
  #world-stage .world-note{padding:0 12px 4px 16px}
  #world-stage .experiment-actions{gap:8px;padding:6px 12px}
  #world-stage .experiment-actions .btn{padding:10px 12px;gap:8px}
- #world-stage #lab-skip{min-height:44px;padding:4px 10px;line-height:1.15}
 }
 /* QA A2/M2: em pé com até 700 px de altura (Safari com as barras, Android pequeno), o mapa fica com 26% (no mínimo 173 px,
    para o Rumo continuar com 56 px). A pergunta nunca fica com menos de 120 px: se não couber, o bloco cresce
@@ -234,7 +233,6 @@ html:has(#bosque:not([hidden])){scroll-padding-top:var(--top-h,78px)}
  #world-stage .world-adjust-buttons{grid-template-columns:repeat(8,44px);gap:2px}
  #world-stage .back-label{position:absolute;width:1px;height:1px;margin:-1px;overflow:hidden;clip-path:inset(50%);white-space:nowrap}
  #world-stage #experiment-back{flex:none;width:44px;padding:0}
- #world-stage #lab-skip{padding:4px 10px;line-height:1.15}
 }
 /* Celular em pé com um campo de texto em foco: o mapa recolhe para a fila de paradas, para o teclado não cobrir o campo. */
 /* A folga embaixo deixa qualquer campo subir para o alto da área; o teclado cobre essa parte. */
@@ -278,6 +276,39 @@ html:has(#bosque:not([hidden])){scroll-padding-top:var(--top-h,78px)}
 #world-stage[data-instant] *,#world-stage[data-instant]::before{transition:none!important}
 .passage-note{position:absolute;left:50%;top:12px;z-index:1;margin:0;padding:6px 16px;border:2px solid var(--ink);border-radius:999px;background:var(--white);font-size:15px;font-weight:900;white-space:nowrap;transform:translateX(-50%);opacity:0;pointer-events:none}
 #world-stage[data-passage]:not([data-closing]) .passage-note{opacity:1}
+/* Lote 5.11: o aviso da comemoração diz a fase e o que a pessoa fez, em duas linhas. Com movimento reduzido ou pausa ele aparece
+   do mesmo jeito (data-cheer), sem o mapa crescer. */
+.passage-note{display:grid;justify-items:center;border-radius:16px;padding:6px 16px 7px;text-align:center;line-height:1.25}
+.passage-note small{font-size:14px;font-weight:800;color:var(--muted)}
+#world-stage[data-cheer] .passage-note{opacity:1}
+/* QA M3 e B8: no alto do mapa o aviso cobria o Rumo, o "Você está aqui" e o nome do Bino. Ele fica na base, sobre a faixa dos botões
+   da câmera, que o enquadramento deixa livre de personagens, paradas e rótulos; como na passagem, os botões e o "Dicas" saem. */
+.passage-note{top:auto;bottom:8px}
+.passage-note[data-at=top]{top:12px;bottom:auto}
+#world-stage[data-cheer] :is(.world-guide-open,.world-camera){opacity:0;pointer-events:none}
+/* Lote 5.11: comemoração de tela cheia ao guardar a trilha: um quadro sobre a página escurecida, parado depois do confete. */
+.trail-done{position:fixed;inset:0;width:100%;height:100%;max-width:none;max-height:none;margin:0;padding:16px;border:0;background:#1c2744cc;color:var(--ink);overflow:hidden;overscroll-behavior:contain}
+.trail-done[open]{display:grid;place-items:center}
+.trail-done::backdrop{background:transparent}
+.trail-confetti{position:absolute;inset:0;z-index:1;overflow:hidden;pointer-events:none}
+.trail-confetti i{position:absolute;top:0;width:10px;height:14px;border:1.5px solid var(--white);border-radius:2px}
+.trail-card{position:relative;display:grid;justify-items:center;gap:10px;width:min(100%,520px);max-height:100%;overflow:auto;padding:20px 24px 24px;border:2px solid var(--ink);border-radius:28px;background:var(--white);box-shadow:0 6px 0 var(--ink-deep);text-align:center}
+.trail-rumo{width:150px;margin:-4px 0 -10px}
+.trail-rumo .companion{display:block}
+.trail-rumo .companion[data-state=celebrate] .bob{animation:none}
+.trail-card h2{margin:0;font-size:30px}
+.trail-lead{margin:0;font-size:15px;color:var(--muted)}
+.trail-summary{display:grid;gap:8px;width:100%;margin:4px 0;text-align:left}
+.trail-summary div{padding:8px 14px;border:2px solid var(--line);border-radius:16px;background:var(--cream)}
+.trail-summary dt{font-size:14px;font-weight:800;color:var(--muted)}
+.trail-summary dd{display:-webkit-box;margin:0;overflow:hidden;font-size:16px;font-weight:900;line-height:1.3;overflow-wrap:anywhere;-webkit-box-orient:vertical;-webkit-line-clamp:2}
+.trail-card .btn{min-height:44px}
+@media(orientation:portrait) and (min-height:760px){.trail-summary dd{-webkit-line-clamp:3}}
+@media(orientation:portrait) and (max-height:700px){.trail-card{gap:6px;padding:14px 18px 18px}.trail-rumo{width:96px;margin:-4px 0 -6px}.trail-card h2{font-size:24px}.trail-summary div{padding:6px 12px}}
+@media(max-height:640px) and (min-aspect-ratio:4/3){.trail-card{grid-template-columns:150px minmax(0,1fr);column-gap:20px;width:min(100%,720px);text-align:left;justify-items:start}
+ .trail-rumo{grid-row:1/span 4;align-self:center;margin:0}.trail-summary dd{-webkit-line-clamp:1}.trail-summary{gap:6px}
+ /* Deitado o cartão passava 30 px da altura: cada item do resumo numa linha, com o título ao lado do texto. */
+ .trail-done{padding:8px}.trail-summary div{display:flex;align-items:baseline;gap:8px;padding:6px 12px}.trail-summary dt{flex:none}}
 /* Passo compacto (opção A, escolhida por Marcelo em 15/10): sem a linha "01 / ...", escolhas em duas colunas só com o título
    (a descrição da atividade marcada aparece numa linha abaixo) e revisão com título, estado e Editar por bloco. */
 .help-short{display:none}
@@ -303,10 +334,24 @@ html:has(#bosque:not([hidden])){scroll-padding-top:var(--top-h,78px)}
 #world-stage[data-phase] .compare-column h2{font-size:15px;color:var(--muted)}
 #world-stage[data-phase] #experiment-fields:not([data-part="0"]) .compare-column h2{display:none}
 #world-stage[data-phase] .compare-column label:first-of-type{margin-top:4px}
-/* Nos passos opcionais a frase de para que servem fica no lugar do título, que segue para o leitor de tela, e o "(opcional)"
-   de cada rótulo sai, porque a frase já diz. */
+/* Nos passos 2 e 3 a frase de para que servem fica no lugar do título, que segue para o leitor de tela. Lote 5.11: a primeira
+   pergunta do passo é a que ele pede ([data-req], sem "(opcional)"); as outras ficam marcadas, com o "(opcional)" na linha do
+   rótulo (na grade do rótulo ele ganhava uma linha só dele). Só o "(opcional)" do rótulo some: as descrições das escolhas
+   seguem para o leitor de tela (QA O3 do 5.7). */
 #world-stage[data-phase] #experiment-fields:not([data-part="0"])>h1{position:absolute;width:1px;height:1px;margin:-1px;overflow:hidden;clip-path:inset(50%);white-space:nowrap}
-#world-stage[data-phase] #experiment-fields:not([data-part="0"]) label small{display:none}
+#world-stage[data-phase] :is(label[data-req],[data-req] label)>small{display:none}
+#world-stage[data-phase] label:has(>small){display:block}
+#world-stage[data-phase] label:has(>small)>:is(textarea,input,select){display:block;width:100%;margin-top:7px}
+/* Lote 5.11: o que falta no passo, junto do campo (logo acima dele), com ícone e texto; nos textos, com "Ainda não sei". */
+#world-stage .field-error{grid-column:1/-1;display:flex;flex-wrap:wrap;align-items:center;gap:4px 8px;margin:12px 0 -8px;font-size:14px;font-weight:800;line-height:1.35;color:var(--ink)}
+#world-stage .field-error .field-alert{flex:none;color:var(--coral-deep)}
+#world-stage .field-error-text{flex:0 1 auto}
+#world-stage #experiment-fields{position:relative}
+/* "Ainda não sei" fica no canto do campo vazio; numa coluna estreita (deitado, campos lado a lado) o texto quebra em duas linhas. */
+#world-stage .field-dunno{position:absolute;z-index:1;min-height:44px;margin:0;padding:4px 10px;font-size:14px;line-height:1.15;text-align:center}
+/* Fora da grade dos campos: deitado, todo filho ganha uma coluna, e a posição passava a contar da área da grade, 16 px adiante. */
+#world-stage[data-phase] #experiment-fields>.field-dunno{grid-column:auto;grid-row:auto}
+#world-stage [aria-invalid=true]{border-color:var(--coral-deep)}
 #world-stage[data-phase] #experiment-fields:not([data-part="0"]) .part-why{font-size:17px;font-weight:800;line-height:1.35;color:var(--ink)}
 /* Atividades e prioridades: o título já pergunta, então a legenda fica só para o leitor de tela; contador e descrição da
    opção marcada dividem uma linha. */
@@ -361,6 +406,9 @@ html:has(#bosque:not([hidden])){scroll-padding-top:var(--top-h,78px)}
  #world-stage[data-phase] #experiment-fields[data-cols="2"]>:is(label,div:not(.compare-grid)){grid-column:span 3}
  #world-stage[data-phase] #experiment-fields[data-cols="3"]>:is(label,div:not(.compare-grid)){grid-column:span 2}
  #world-stage[data-phase] .choice-grid{grid-template-columns:repeat(3,minmax(0,1fr))}
+ /* Lote 5.11: com o "(opcional)" na linha do rótulo, as colunas de 125 px ganhavam uma linha (3.2, 3.3 e 6.2 passavam a rolar);
+    os rótulos ficam com linhas mais juntas, só aqui. */
+ #world-stage[data-phase] #experiment-fields label:not(.choice){line-height:1.25}
  /* Os oito botões de ajuste em duas linhas de quatro, dentro da coluna do mapa. */
  #world-stage[data-phase] .world-adjust-buttons{grid-template-columns:repeat(4,44px)}
  #world-stage[data-phase] .lab-review{grid-template-columns:repeat(3,minmax(0,1fr))}
@@ -380,8 +428,6 @@ html:has(#bosque:not([hidden])){scroll-padding-top:var(--top-h,78px)}
 #world-stage[data-phase] #experiment-status:empty{display:none}
 /* QA M9 (17/10): a faixa de mensagem não segura o toque no campo que ela cobre. */
 #world-stage[data-phase] #experiment-status{pointer-events:none}
-@media(max-width:599px){#world-stage #part-skip{min-height:44px;padding:4px 10px;line-height:1.15}}
-@media(max-height:640px) and (min-aspect-ratio:4/3){#world-stage #part-skip{padding:4px 10px;line-height:1.15}}
 /* Lote 5.8: com o mapa mais alto, os passos mais altos de 1280×720 (revisão, 4.2 e 6.1) perdiam a folga. Só no desktop:
    nos opcionais a frase faz o papel da dica e o primeiro bloco fica a 12 px dela; escolhas com menos opções que colunas
    ocupam a linha (o texto cabe numa linha só); cada bloco da revisão fica numa linha, com título, estado e Editar. */

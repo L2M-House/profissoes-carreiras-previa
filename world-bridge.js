@@ -4,33 +4,56 @@ const PLACES=['Clareira','Moinho','Ponte','Placa','Bifurcação','Acampamento','
 const STOPS=Journey.steps.map((s,i)=>({...s,place:PLACES[i],mark:MARCAS.find(m=>m.id===s.stage)}));
 const LOCK='<svg viewBox="0 0 16 16" width="14" height="14" aria-hidden="true"><path d="M5 7V5a3 3 0 0 1 6 0v2" fill="none" stroke="currentColor" stroke-width="2"/><rect x="3.5" y="7" width="9" height="7" rx="1.5" fill="currentColor"/></svg>';
 // Lote 5.10: cada estado tem o mesmo nome e o mesmo símbolo no mapa, na fila e na legenda. O contrato não muda: a ponte lê o
-// estado dele e o rascunho. Feita é a fase com o passo 1 respondido (ou o exercício guardado); começada, a que tem alguma
-// resposta sem ele; aberta, a que ainda não tem nenhuma.
+// estado dele e o rascunho. Lote 5.11: feita é a fase com todos os passos respondidos (ou o exercício guardado); começada, a que
+// tem alguma resposta e ainda falta passo; aberta, a que ainda não tem nenhuma. "Deixada para depois" só vem de rascunho ou
+// registro de antes do 5.11: na rota do Filho não há mais "Responder depois".
 const LOOK_TEXT={aqui:'Você está aqui',feita:'Feita',comecada:'Começada',depois:'Deixada para depois',fechada:'Fechada',aberta:'Aberta'};
 const LOOK_GLYPH={feita:'✓',comecada:'✎',depois:'↷'};
 const filled=v=>Array.isArray(v)?v.length>0:!!String(v??'').trim();
 const LAB_HOME=[$('experiment-form').parentElement,$('experiment-form').nextSibling];
 let worldView,worldLoading=false,worldFailed=false,worldCelebrationPending=null,worldAutoStart=false,worldEntering=false;
-// Lote 5.7: cada parada é uma fase de passos curtos, um por tela. O passo 1 é o obrigatório do contrato (Journey.validStep);
-// os outros são opcionais, com "Pular". Campos, perguntas e gravação são os de experiment.js: o passo só mostra uma parte
-// da pergunta, que continua inteira no formulário. Os nomes são dos campos; cada um aponta para o bloco que o contém.
+// Lote 5.7: cada parada é uma fase de passos curtos, um por tela. Campos, perguntas e gravação são os de experiment.js: o passo
+// só mostra uma parte da pergunta, que continua inteira no formulário. Os nomes são dos campos; cada um aponta para o bloco que o
+// contém.
 const PARTS=[[['activities'],['activityNote','activityExperience']],[['values'],['firstValue','valueNote']],[['aName','bName'],['aAttract','aRoutine','aRethink'],['bAttract','bRoutine','bRethink']],
  [['claim','evidence'],['checked','change']],[['path','topic','question'],['searchType','sourcePlan']],[['action','actionPlan'],['when','obstacle','smaller']],[[]]];
-const PART_WHY={'0.1':'Opcional. Um exemplo real ajuda você a lembrar dessa curiosidade.','1.1':'Opcional. Ajuda a ver essa prioridade num dia comum.',
- '3.1':'Opcional. Mostra o que ainda vale investigar.','4.1':'Opcional. Ajuda a escolher o próximo passo.','5.1':'Opcional. Uma data e um plano menor ajudam a cumprir o passo.'};
+const PART_WHY={'0.1':'Um exemplo real ajuda você a lembrar dessa curiosidade.','1.1':'Ajuda a ver essa prioridade num dia comum.',
+ '3.1':'Mostra o que ainda vale investigar.','4.1':'Ajuda a escolher o próximo passo.','5.1':'Pensar no que pode atrapalhar ajuda a cumprir o passo.'};
+// Lote 5.11: na rota do Filho todo passo pede uma resposta antes de seguir. O passo 1 pede o que o contrato pede e, na Bifurcação,
+// também a primeira pergunta, "Qual possibilidade?" (QA B4: ela não era pedida nem marcada como opcional). Nos outros passos, a
+// primeira pergunta; as demais ficam "(opcional)". No passo 2 do Acampamento a primeira pergunta é uma data, que não aceita "Ainda
+// não sei" e que o exemplo fictício não preenche: ali vale a primeira de texto, "O que pode dificultar?".
+const NEED=[[['activities'],['activityNote']],[['values'],['firstValue']],[['aName','bName'],['aAttract'],['bAttract']],[['claim','evidence'],['checked']],[['path','topic','question'],['searchType']],[['action','actionPlan'],['obstacle']],[[]]];
+const NEED_MSG={activities:'Escolha pelo menos uma atividade para seguir.',activityNote:'Escreva uma situação para seguir.',values:'Escolha pelo menos uma prioridade para seguir.',firstValue:'Escolha a prioridade que quer investigar primeiro.',
+ aName:'Escreva o nome da possibilidade A para seguir.',bName:'Escreva o nome da possibilidade B para seguir.',aAttract:'Escreva o que atrai você nessa possibilidade para seguir.',bAttract:'Escreva o que atrai você nessa possibilidade para seguir.',
+ path:'Escolha a possibilidade da sua dúvida para seguir.',claim:'Escreva uma ideia que quer conferir para seguir.',evidence:'Escolha como você chegou a essa ideia.',checked:'Escolha quanto você conseguiu conferir.',topic:'Escolha um tema para seguir.',
+ question:'Escreva a pergunta que quer responder para seguir.',searchType:'Escolha como poderia buscar essa informação.',action:'Escolha como quer começar.',actionPlan:'Escreva o que você vai fazer para seguir.',obstacle:'Escreva o que pode dificultar para seguir.'};
+const DUNNO='Ainda não sei';
+// O que falta num passo, na ordem da tela; vazio quando ele está respondido.
+function missing(i,k,d){
+ const m=(NEED[i][k]||[]).filter(n=>!filled(d[n])&&!(n==='actionPlan'&&d.action==='Definir depois'));
+ return k||m.length||Journey.validStep(i,d)?m:NEED[i][0].slice(0,1);// o passo 1 nunca fica aquém do contrato
+}
+// Fase completa: todos os passos respondidos. O Mirante só fica feito com o exercício guardado.
+const phaseDone=(i,d)=>i<6&&PARTS[i].every((_,k)=>!missing(i,k,d).length);
 const SIDE=matchMedia('(max-height:640px) and (min-aspect-ratio:4/3)');// o mesmo corte do CSS: mapa à esquerda, pergunta à direita
 let part=0,passing=null,enterLast=false,passage=null;
 const worldOwnsForm=()=>$('world-question').contains($('experiment-form'));
 const shownState=s=>s.available?s.state:'bloqueada';
-const lookOf=(s,data)=>!s.available?'fechada':s.state==='guardado'?(data['skip'+s.index]?'depois':'feita'):{foco:'aqui',rascunho:'feita',adiado:'depois'}[s.state]||(PARTS[s.index].flat().some(n=>filled(data[n]))?'comecada':'aberta');
+const lookOf=(s,data)=>!s.available?'fechada':s.state==='guardado'?(data['skip'+s.index]?'depois':'feita'):s.state==='foco'?'aqui':phaseDone(s.index,data)?'feita':s.state==='adiado'?'depois':PARTS[s.index].flat().some(n=>filled(data[n]))?'comecada':'aberta';
 function worldDomain(){
  const snapshot=lab.owner===owner()&&lab.programa===programa?lab:journeys()[journeyKey('experiment')]?.snapshot||{owner:owner(),programa,step:0,data:{},started:false};
  const recorded=!snapshot.started&&answers().some(a=>a.quem===owner()&&a.programa===programa&&a.experimento?.versao===1);
  // Lote 5.10: com o exercício guardado, a aparência de cada fase vem das respostas guardadas: deixada para depois continua assim
  // (achado do QA: tudo adiado e guardado aparecia como "Feita").
- const saved=recorded?answers().filter(a=>a.quem===owner()&&a.programa===programa&&a.experimento?.versao===1).at(-1)?.experimento?.respostas:null;
- return {snapshot,recorded,steps:Journey.project(snapshot,recorded),data:saved||snapshot.data||{}};
+ const saved=recorded?answers().filter(a=>a.quem===owner()&&a.programa===programa&&a.experimento?.versao===1).at(-1)?.experimento?.respostas:null,data=saved||snapshot.data||{};
+ // Lote 5.11: uma fase abre quando todas as anteriores estão completas, com todos os passos; o contrato (congelado) só conhece o
+ // passo 1, então a ponte decide. A fase em que a pessoa está fica aberta; com o exercício guardado, todas, como no contrato.
+ const open=i=>recorded||i===snapshot.step||STOPS.slice(0,i).every((_,j)=>phaseDone(j,data));
+ return {snapshot,recorded,steps:Journey.project(snapshot,recorded).map(s=>({...s,available:open(s.index)})),data};
 }
+// A primeira fase incompleta antes da fase i: é ela que a fase i espera.
+const blocker=(i,data)=>STOPS.findIndex((_,j)=>j<i&&!phaseDone(j,data));
 function celebrateWorldIfPending(){
  if(current!=='trilha'||programa!=='filho')return false;
  const pending=worldCelebrationPending;worldCelebrationPending=null;
@@ -45,7 +68,7 @@ const MAP_CAST=['bino','pipa','teo','rumo'];
 const GUIDE_GESTURE=['acolher','apontar','andar','apontar','apontar','andar','acolher'];// do banco de cada guia, por parada
 // Tempos da tabela do plano (ms). A cascata acende uma parada a cada 55 ms e termina em 6×55+170 = 500.
 const FX={toque:100,someToque:150,antes:90,pouso:320,poeira:300,olhar:180,volta:700,destrava:400,rascunho:200,pensar:300,passo:55,acende:170,festa:900,fade:150,
- abre:300,anda:240,fecha:300,passagem:1700};// Lote 5.7: o mapa abre em 300 ms, o Rumo sai aos 240 ms, tudo volta até 1,7 s
+ abre:300,anda:240,fecha:300,passagem:2400};// Lote 5.7: o mapa abre em 300 ms, o Rumo sai aos 240 ms. Lote 5.11: com a comemoração, tudo volta até 2,4 s
 const FIGURE_UNITS=1.55;// altura do desenho (viewBox de 260) em unidades do mundo: Rumo com 56 a 72 px no foco do celular
 const ZOOM_OUT='<svg class="cam-icon" viewBox="0 0 16 16" width="16" height="16" aria-hidden="true"><circle cx="7" cy="7" r="5" fill="none" stroke="currentColor" stroke-width="2"/><path d="M4.5 7h5M11 11l3.5 3.5" stroke="currentColor" stroke-width="2" stroke-linecap="round"/></svg>',ZOOM_IN=ZOOM_OUT.replace('M4.5 7h5','M4.5 7h5M7 4.5v5');
 const LOCK_OPEN='<svg viewBox="0 0 16 16" width="14" height="14" aria-hidden="true"><path d="M11 7V4a3 3 0 0 0-6 0v1" fill="none" stroke="currentColor" stroke-width="2"/><rect x="3.5" y="7" width="9" height="7" rx="1.5" fill="currentColor"/></svg>';
@@ -78,8 +101,15 @@ function layoutMap(a){
 // lado, dentro da faixa acima dos botões, sem cobrir um personagem, o botão de dicas nem outro rótulo. Primeiro o "Você está
 // aqui", depois os nomes; um nome que não cabe em lugar nenhum, ou cujo personagem saiu do quadro, não aparece.
 let guideBox=null;
+// Lote 5.11 (QA M3 e B8): o aviso da comemoração fica na base do mapa (no celular em pé, sobre a faixa dos botões da câmera, que o
+// enquadramento deixa livre) e sobe para o alto quando o Rumo ficaria embaixo dele (deitado não há essa faixa). Os nomes desviam dele.
+function cheerBox(a){
+ const n=$('world-viewport').querySelector('.passage-note'),st=$('world-stage');if(!n||!('cheer' in st.dataset)&&!(st.dataset.passage&&!('closing' in st.dataset)))return null;
+ const k=fxScale(a),h=n.offsetHeight,w=n.offsetWidth,low=a.height-8-h;n.dataset.at=a.rumo.y+11*k>low&&a.rumo.y-119*k>h+16?'top':'bottom';
+ return {x:a.width/2-w/2,y:n.dataset.at==='top'?12:low,w,h};
+}
 function layoutTags(a){
- const tags=mapLayer?.querySelector('.map-tags');if(!tags)return;const k=fxScale(a),floor=a.height-(a.inset||0),taken=guideBox?[guideBox]:[];
+ const tags=mapLayer?.querySelector('.map-tags');if(!tags)return;const k=fxScale(a),floor=a.height-(a.inset||0),cheer=cheerBox(a),taken=[guideBox,cheer].filter(Boolean);
  const figs=MAP_CAST.map(n=>{const f=mapLayer.querySelector(`[data-figure=${n}]`),p=n==='rumo'?a.rumo:a.guides[n];return {n,p,on:f.style.visibility!=='hidden',box:{x:p.x-45*k,y:p.y-112*k,w:90*k,h:120*k}};});
  // QA M6 (17/10): o nome de um personagem fica a pelo menos 10 px dos outros desenhos, para não parecer o nome do vizinho. O
  // "Você está aqui" não tem essa margem: no mapa curto do celular ele deixava de caber.
@@ -104,7 +134,7 @@ function pose(fig,key){
  for(const [sel,v] of Object.entries(p.parts)){if(sel==='.marca-velocidade'||sel==='.marca-poeira')continue;const m=fig.querySelector(sel+'>.mov');if(m){m.style.transform=T(v);if(sel.startsWith('.marca'))m.style.opacity=1;}}
 }
 function stopMapMotion(){
- finishPassage();for(const key of [...mapRuns.keys()])stopRuns(key);mapTimers.forEach(clearTimeout);mapTimers.clear();
+ finishPassage();endCheer();for(const key of [...mapRuns.keys()])stopRuns(key);mapTimers.forEach(clearTimeout);mapTimers.clear();
  mapLayer?.querySelectorAll('.map-fx').forEach(e=>e.remove());mapLayer?.querySelectorAll('.companion').forEach(f=>pose(f,'repouso'));
 }
 // Efeito preso a uma parada (índice) ou ao Rumo; sai do DOM quando acaba ou é cancelado.
@@ -146,12 +176,13 @@ function onRumoWalk(e){
  if(e.type!=='arrive')return;
  if(mapQuiet||!e.moved&&!e.walked)return;
  const passed=passage?.to===e.index?passage.from:null;
- $('world-live').textContent=(passed===null?'':`Fase ${passed+1} concluída. `)+`Rumo chegou à fase ${e.index+1}, ${STOPS[e.index].place}.`;
+ $('world-live').textContent=(passed===null?'':`Fase ${passed+1} de 7 concluída. `)+`Rumo chegou à fase ${e.index+1}, ${STOPS[e.index].place}.`;
  stopRuns('rumo');pose(rumo,'repouso');if(e.stopped)return;
  if(e.walked&&!motionOff()){track('rumo',[body.animate([{transform:from},{transform:'scale(1.08,.92)',offset:.25},{transform:'scale(.97,1.03)',offset:.55},{transform:'scale(1.01,.99)',offset:.8},{transform:'scale(1)'}],{duration:FX.pouso,easing:E.meio})]);dust();}
  else if(motionOff())track('rumo',[body.animate([{opacity:0},{opacity:1}],{duration:FX.fade})]);
  // Lote 5.7: na passagem de fase, a parada concluída acende e o guia da terra dela comemora, no lugar da reação de chegada.
- if(passed!==null&&e.walked&&!motionOff())celebratePhase(passed);
+ // Lote 5.11: o Rumo também, com o confete; com movimento reduzido ou pausa, os dois em pose parada.
+ if(passed!==null){if(e.walked&&!motionOff())celebratePhase(passed,e.index);else if(motionOff())quietCheer(passed);}
  else if(e.walked||motionOff())guideReact(e.index);
 }
 // Exercício guardado: câmera abre o bosque, as sete paradas acendem em cascata, os quatro comemoram juntos, poucos confetes.
@@ -205,10 +236,11 @@ function paintWorld(){
 }
 function setWorldStatus(text){$('world-status').textContent=text;}
 function goStop(i,from=null){
- const d=worldDomain(),s=d.steps[i];if(!s)return;finishPassage();
+ const d=worldDomain(),s=d.steps[i];if(!s)return;finishPassage();endCheer();
  // Lote 5.10: a fase fechada diz, ao lado dela (na fila ou no mapa), por que ainda não abre. O mapa fica como está: no celular,
- // fechar o mapa aberto levava a parada para fora da tela e o balão apontava para o vazio.
- if(!s.available&&!(d.recorded&&!lab.started)){worldView?.gust(i);tapRing(i);lockedNote(i,from);return;}
+ // fechar o mapa aberto levava a parada para fora da tela e o balão apontava para o vazio. Lote 5.11: todo caminho até uma fase
+ // (fila, toque no mapa e em "Mover o mapa", teclado, toque durante a passagem) passa por aqui, com a trava de fase completa.
+ if(!s.available&&!(d.recorded&&!lab.started)){worldView?.gust(i);tapRing(i);lockedNote(i,from,phaseDone(i-1,d.data)?blocker(i,d.data):i-1);return;}
  closeMap();worldView?.gust(i);// Lote 5.9: o vento sopra na parada tocada
  setWorldStatus(worldFailed||'');tapRing(i);
  if(d.recorded&&!lab.started){worldView?.select(i);return;}
@@ -228,7 +260,7 @@ function placeLab(inWorld){
  const form=$('experiment-form');
  if(inWorld&&!worldOwnsForm()){$('world-question').append(form);form.hidden=false;startLabInWorld();}
  if(!inWorld&&worldOwnsForm()){
-  finishPassage();form.querySelectorAll('.experiment-actions :is(#lab-skip,#part-skip)').forEach(b=>b.remove());// a página do laboratório recria o seu no fim da pergunta
+  finishPassage();clearMissing();
   LAB_HOME[0].insertBefore(form,LAB_HOME[1]);$('experiment-back').hidden=false;
   if(worldAutoStart&&!Object.keys(lab.data).length){lab.started=false;worldAutoStart=false;}
   if(current==='experimento')renderExperiment();
@@ -244,7 +276,7 @@ function syncWorld(){
  if(worldFailed){maybeTips();return;}
  if(!worldView){
   if(worldLoading)return;worldLoading=true;
-  const script=document.createElement('script');script.src='media/world/bosque.bundle.js?v=15';
+  const script=document.createElement('script');script.src='media/world/bosque.bundle.js?v=16';
   script.onerror=()=>worldFallback('Não foi possível abrir o 3D. As paradas e as perguntas continuam disponíveis.');
   script.onload=()=>{try{buildMapLayer();worldView=Bosque.create($('world-viewport'),{onSelect:goStop,onError:worldFallback,onView:paintWorldCamera,onFrame:layoutMap,onWalk:onRumoWalk});window.mapWorld=worldView;measureInsets();$('world-viewport').dataset.ready='true';paintWorld();const done=worldDomain().recorded&&!lab.started;mapQuiet=true;worldView.select(done?6:lab.step,{instant:true});mapQuiet=false;if(done)worldView.camera('center');syncWorld();if(!done)worldView.intro();maybeTips();}catch{worldFallback('Seu navegador não abriu o 3D. Use a lista de paradas.');}};
   document.head.append(script);return;
@@ -274,11 +306,9 @@ function paintWorldCamera(state){
 }
 // A vista já mudou quando show('experimento') redesenha a pergunta, antes de o formulário sair do bosque: aí não é o bosque.
 window.addEventListener('lab:step',()=>{if(!worldOwnsForm()||current!=='trilha')return;
- // Lote 5.5: Voltar, Deixar para depois e Continuar ficam presos no rodapé do bloco; a pergunta nova começa do topo.
- const next=$('experiment-next'),skip=$('experiment-fields').querySelector('#lab-skip');next.parentElement.querySelector('#lab-skip')?.remove();
- if(skip){skip.textContent='Responder depois';skip.title=KEPT;next.before(skip);}
- // Lote 5.7: "Pular" fica no lugar de "Deixar para depois" nos passos opcionais e faz o mesmo caminho de Continuar.
- if(!$('part-skip')){const b=document.createElement('button');b.type='button';b.className='back';b.id='part-skip';b.textContent='Pular esta parte';b.onclick=()=>$('experiment-form').requestSubmit();next.before(b);}
+ // Lote 5.5: Voltar e Continuar ficam presos no rodapé do bloco; a pergunta nova começa do topo. Lote 5.11: na rota do Filho
+ // todo passo é respondido: "Responder depois" (que abria a fase seguinte) e "Pular" saem. O que foi escrito continua no rascunho.
+ $('experiment-fields').querySelector('#lab-skip')?.remove();
  $('experiment-back').innerHTML=icon('back')+'<span class="back-label">Voltar</span>';
  // Lote 5.10: o botão de ajuda leva o nome de quem ajuda nesta fase (o guia da terra), no mesmo lugar em toda fase.
  const g=STEP_COMPANIONS[lab.step];$('lab-help').querySelector('.help-world').lastChild.textContent=`${g==='pipa'?'à':'ao'} ${ELENCO[g].name}`;
@@ -288,12 +318,8 @@ window.addEventListener('lab:step',()=>{if(!worldOwnsForm()||current!=='trilha')
  showPart(enterLast&&stepValid()&&!lab.data['skip'+lab.step]?PARTS[lab.step].length-1:worldEntering&&lab.passo?.parada===lab.step?lab.passo.n:0);enterLast=false;
  if(from!==null&&lab.step===from+1&&!worldEntering)passPhase(from);
  else{mapQuiet=worldEntering;worldView?.select(lab.step,{instant:worldEntering});mapQuiet=false;}
- // Lote 5.10: "Responder depois" confirma que nada se perde; a etapa nova se explica na primeira vez.
- // QA B5 e M9 (17/10): a segunda frase só quando havia resposta, e o aviso fica 6 s (são até 11 palavras).
- if(skipped){skipped=false;const had=PARTS[lab.step-1]?.flat().some(n=>filled(lab.data[n]));status('experiment-status',`Fase ${lab.step} deixada para depois.`+(had?` ${KEPT}`:''));$('experiment-status').dataset.hold='';}
+ // Lote 5.10: a etapa nova se explica na primeira vez.
  stageNote();});
-let skipped=false;const KEPT='O que você escreveu fica guardado.';
-document.addEventListener('click',e=>{if(worldOwnsForm()&&e.detail<=1&&e.target.closest('#lab-skip'))skipped=true;},true);
 // Mostra um passo da fase atual: os blocos dos outros passos ficam com data-off (o CSS esconde), mas seguem no formulário.
 function blockOf(name){
  if(name==='firstValue')return $('priority-first');if(name==='sourcePlan')return $('source-followup');// blocos que experiment.js redesenha por dentro
@@ -302,7 +328,7 @@ function blockOf(name){
 function partWhy(){
  if(lab.step!==2)return PART_WHY[lab.step+'.'+part]||'';
  const name=(lab.data[part===1?'aName':'bName']||'').trim();
- return `Opcional. Suas respostas viram perguntas sobre ${name?`“${name}”`:`a possibilidade ${part===1?'A':'B'}`}.`;
+ return `Suas respostas viram perguntas sobre ${name&&name!==DUNNO?`“${name}”`:`a possibilidade ${part===1?'A':'B'}`}.`;
 }
 function showPart(k){
  closeMap();// QA O5: o mapa aberto por "Ver bosque" fecha ao trocar de passo
@@ -313,7 +339,9 @@ function showPart(k){
  f.querySelectorAll('.compare-column').forEach(c=>c.style.setProperty('--n',c.querySelectorAll('label:not([data-off])').length||1));
  let why=f.querySelector('.part-why');if(!why){why=document.createElement('p');why.className='part-why';f.querySelector('h1')?.after(why);}
  why.textContent=part?partWhy():'';
- $('part-skip')&&($('part-skip').hidden=!part);if($('lab-skip'))$('lab-skip').hidden=!!part;$('experiment-back').hidden=lab.step===0&&!part;
+ // Lote 5.11: o campo que o passo pede perde o "(opcional)"; os outros do passo ficam marcados. A mensagem do que faltava sai.
+ f.querySelectorAll('[data-req]').forEach(b=>b.removeAttribute('data-req'));(NEED[lab.step]?.[part]||[]).forEach(n=>blockOf(n)?.setAttribute('data-req',''));clearMissing();
+ $('experiment-back').hidden=lab.step===0&&!part;
  status('experiment-status','');f.scrollTop=0;
  if(lab.step===0)paintChoiceNote();if(lab.step===6)paintReviewStates();
  // Campo aditivo no rascunho da aba: quem sai e volta cai no mesmo passo. Só olhar o mapa, sem nenhuma resposta, não cria
@@ -332,34 +360,63 @@ document.addEventListener('change',e=>{if(worldOwnsForm()&&e.target.name==='acti
 // Revisão compacta: cada bloco mostra o título, o estado e Editar; o texto completo sai em "Baixar meu resumo".
 function paintReviewStates(){
  $('experiment-fields').querySelectorAll('.review-section').forEach((s,i)=>{let t=s.querySelector('.review-state');if(!t){t=document.createElement('span');t.className='review-state';s.querySelector('h2').after(t);}
-  t.textContent=lab.data['skip'+i]?'Deixada para depois':Journey.validStep(i,lab.data)?'Respondida':'A investigar';});
+  t.textContent=lab.data['skip'+i]?'Deixada para depois':phaseDone(i,lab.data)?'Respondida':'A investigar';});
 }
 function focusPart(){const f=$('experiment-fields'),t=part?f.querySelector('.part-why'):f.querySelector('h1');if(!t)return;t.tabIndex=-1;t.focus({preventScroll:true});
  $('world-live').textContent=`Passo ${part+1} de ${PARTS[lab.step].length}.`;}// QA O1: o leitor de tela ouve o passo
-// Continuar e Pular dentro da fase. O passo 1 checa o obrigatório como hoje (checkStep); o último deixa o submit de
-// experiment.js concluir a fase (rascunho guardado, próxima parada aberta) e marca a passagem para o evento lab:step.
+// Continuar dentro da fase. Lote 5.11: cada passo pede a sua resposta antes de seguir, e a fase só termina completa (um passo
+// anterior que ficou vazio volta à tela com a mensagem). O último passo deixa o submit de experiment.js concluir a fase
+// (rascunho guardado, próxima parada aberta) e marca a passagem para o evento lab:step. No Mirante, guardar pede as seis fases.
 document.addEventListener('submit',e=>{
+ // lab.data já está em dia: experiment.js o atualiza a cada input e change (ler o formulário de novo custava um quadro no celular lento).
  if(e.target.id!=='experiment-form'||!worldOwnsForm()||labSaved)return;passing=null;finishPassage();
- const last=PARTS[lab.step].length-1;
- if(part<last){e.preventDefault();e.stopImmediatePropagation();if(part===0&&!checkStep())return;collectLab();showPart(part+1);focusPart();return;}
- if(part>0&&!stepValid())showPart(0);// o obrigatório só muda no passo 1; se ficou vazio, experiment.js avisa com ele à vista
- if(lab.step<6&&stepValid())passing=lab.step;// QA A1: só passa de fase se o submit vai mesmo concluir a fase
+ const last=PARTS[lab.step].length-1,hold=()=>{e.preventDefault();e.stopImmediatePropagation();};
+ const k=PARTS[lab.step].findIndex((_,j)=>j<=part&&missing(lab.step,j,lab.data).length);
+ if(k>=0){hold();if(k!==part)showPart(k);showMissing(missing(lab.step,k,lab.data)[0]);return;}
+ if(part<last){hold();showPart(part+1);focusPart();return;}
+ if(lab.step===6){const j=blocker(6,lab.data);if(j>=0){hold();reactCompanion('encourage');status('experiment-status',`Para guardar, termine a fase ${j+1} · ${STOPS[j].place}. Toque em Editar nela.`,true);return;}}
+ if(lab.step<6)passing=lab.step;// QA A1: só passa de fase se o submit vai mesmo concluir a fase
 },true);
+// Lote 5.11: o que falta aparece junto do campo, um por vez, com ícone e texto, e o foco vai para ele; nada é conferido enquanto a
+// pessoa digita. Nos campos de texto, a mensagem traz "Ainda não sei", que responde só aquele campo e não avança: se faltar outro,
+// o próximo Continuar mostra a mensagem nele. Nas escolhas valem as opções que já existem ("Ainda não sei", "Definir depois").
+const ALERT='<svg class="field-alert" viewBox="0 0 16 16" width="18" height="18" aria-hidden="true"><circle cx="8" cy="8" r="7.5" fill="currentColor"/><path d="M8 4v5M8 11.6v.4" stroke="#fffdf9" stroke-width="2.2" stroke-linecap="round"/></svg>';
+const control=n=>$('experiment-fields').querySelector(`[name="${n}"]`),isText=c=>!!c?.matches('textarea,input[type=text]');
+function showMissing(n){
+ clearMissing();reactCompanion('encourage');const c=control(n);if(!c)return;const set=c.closest('fieldset'),block=set||blockOf(n),m=document.createElement('p');
+ // QA B10: no campo, o leitor de tela ouve o que falta e que existe "Ainda não sei", logo depois dele.
+ m.className='field-error';m.dataset.name=n;m.innerHTML=`${ALERT}<span class="field-error-text" id="falta-${n}">${NEED_MSG[n]}</span>`+(isText(c)?`<span class="visually-hidden" id="falta-${n}-dica">Se ainda não souber, use o botão ${DUNNO}, logo depois do campo.</span>`:'');
+ // Com campos lado a lado (tela larga e deitado), a mensagem fica acima da linha toda (no meio dela, quebrava a linha e descia os
+ // campos) e começa na coluna do campo.
+ let at=block;const top=block.getBoundingClientRect().top;for(let p=block.previousElementSibling;p;p=p.previousElementSibling){if(!p.checkVisibility())continue;if(Math.abs(p.getBoundingClientRect().top-top)<2)at=p;else break;}
+ at.before(m);if(at!==block)m.style.paddingLeft=Math.max(0,Math.round(block.getBoundingClientRect().left-m.getBoundingClientRect().left))+'px';
+ // QA M4: "Ainda não sei" fica no canto do próprio campo vazio, logo depois dele na ordem do teclado: na linha da mensagem ele caía
+ // sobre outra pergunta, e preso à coluna estreita a mensagem crescia e fazia o passo rolar. Some quando o campo ganha resposta.
+ if(isText(c)){const b=document.createElement('button'),f=$('experiment-fields');b.type='button';b.className='back field-dunno';b.dataset.for=n;b.textContent=DUNNO;block.after(b);
+  const fr=f.getBoundingClientRect(),cr=c.getBoundingClientRect();b.style.maxWidth=Math.round(cr.width-8)+'px';b.style.top=Math.round(cr.top-fr.top+f.scrollTop+(cr.height-b.offsetHeight)/2)+'px';b.style.left=Math.round(cr.right-fr.left+f.scrollLeft-b.offsetWidth-4)+'px';}
+ (set||c).setAttribute('aria-describedby','falta-'+n+(isText(c)?` falta-${n}-dica`:''));if(!set)c.setAttribute('aria-invalid','true');
+ (set?set.querySelector('input:not(:disabled)'):c).focus({preventScroll:true});m.scrollIntoView({block:'nearest',behavior:'instant'});
+}
+function clearMissing(only){$('experiment-fields').querySelectorAll('.field-error').forEach(m=>{const n=m.dataset.name;if(only&&!only(n))return;const c=control(n);c?.removeAttribute('aria-invalid');(c?.closest('fieldset')||c)?.removeAttribute('aria-describedby');$('experiment-fields').querySelector(`.field-dunno[data-for="${n}"]`)?.remove();m.remove();});}
+$('experiment-fields').addEventListener('click',e=>{const b=e.target.closest('.field-dunno');if(!b||!worldOwnsForm())return;const c=control(b.dataset.for);
+ c.value=DUNNO;c.dispatchEvent(new Event('input',{bubbles:true}));$('experiment-next').focus({preventScroll:true});});
 // Voltar dentro da fase volta um passo; no passo 1, experiment.js abre a fase anterior e ela entra pelo último passo.
 document.addEventListener('click',e=>{if(!worldOwnsForm()||e.detail>1||!e.target.closest('#experiment-back'))return;finishPassage();
  if(part>0){e.preventDefault();e.stopImmediatePropagation();collectLab();showPart(part-1);focusPart();return;}
  enterLast=true;},true);
 // Passagem de fase: o painel desce, o mapa ocupa a área, o Rumo anda até a próxima parada, a concluída acende e o guia
-// da terra comemora; o painel sobe com a fase seguinte, já desenhada. Tudo em até 1,75 s, nada em laço. Movimento
-// reduzido ou pausa: troca direta, com o texto "Fase concluída". Um toque ou uma tecla pulam (finishPassage).
+// da terra comemora; o painel sobe com a fase seguinte, já desenhada. Nada em laço. Um toque ou uma tecla pulam (finishPassage).
+// Lote 5.11: a passagem comemora o que a pessoa fez: na chegada, um estouro único de confete no 3D, o Rumo e o guia comemoram,
+// e o aviso diz "Fase 2 de 7 concluída" e quantos passos ela respondeu; tudo volta em 2,4 s. Movimento reduzido ou pausa trocam a
+// comemoração, sem apagá-la: o mesmo aviso num fade curto, o Rumo e o guia em pose parada, sem confete, mapa crescendo ou caminhada.
 function passPhase(from){
- const to=from+1;closeMap(true);endTips();closeNote(true);
- if(motionOff()||!worldView||worldFailed||!mapLayer){passage={from,to};worldView?.select(to,{instant:true});passage=null;
-  if(!worldView||worldFailed)$('world-live').textContent=`Fase ${from+1} concluída.`;status('experiment-status','Fase concluída.');return;}
- stopCompanionMotion();// a entrada da pergunta nova não roda por trás do mapa
+ const to=from+1,title=`Fase ${from+1} de 7 concluída`,done=`${PARTS[from].length} passos respondidos`;closeMap(true);endTips();closeNote(true);
  const vp=$('world-viewport');let note=vp.querySelector('.passage-note');if(!note){note=document.createElement('p');note.className='passage-note';note.setAttribute('aria-hidden','true');vp.append(note);}
- note.textContent=`Fase ${from+1} concluída`;$('world-live').textContent=`Fase ${from+1} concluída.`;
- passage={from,to,timers:[],...growMap(FX.abre)};
+ note.innerHTML=`<b>${title}</b><small>${done}</small>`;$('world-live').textContent=`${title}. ${done}.`;
+ if(motionOff()||!worldView||worldFailed||!mapLayer){passage={from,to};worldView?.select(to,{instant:true});passage=null;if(!worldView||worldFailed||!mapLayer)quietCheer(from);return;}
+ stopCompanionMotion();// a entrada da pergunta nova não roda por trás do mapa
+ // QA B1: o confete e o Rumo comemorando vêm uma vez por fase concluída; voltar e terminar a fase de novo só faz a passagem.
+ passage={from,to,timers:[],first:!cheered.has(from),...growMap(FX.abre)};cheered.add(from);if(mapAnchors)layoutTags(mapAnchors);
  // Lote 5.8: no desktop o quadro da caminhada guarda o guia da terra concluída, para ele aparecer comemorando.
  // Lote 5.9: a passagem acorda a parada nova (pássaros, fogueira em Agir, flores ao sair da Clareira).
  passage.timers.push(setTimeout(()=>worldView.select(to,{keep:STEP_COMPANIONS[from],passage:from}),FX.anda),setTimeout(closePassage,FX.passagem-FX.fecha));
@@ -396,23 +453,39 @@ function closeMap(instant=false){
  const p=mapOpen;if(!p)return;mapOpen=null;p.a?.cancel();const s=worldView?.state();if(s?.exploring)worldView.setExplore(false);if(s?.overview)worldView.camera('focus');
  resizeMap(()=>{delete $('world-stage').dataset.mapa;},instant?0:FX.fecha);
 }
-function celebratePhase(from){
- popRing(from,FX.destrava);const name=STEP_COMPANIONS[from],fig=figureOf(name);if(!fig)return;
- if(name!=='rumo'){stopRuns(name);faceTo(fig,mapAnchors.rumo.x,mapAnchors.guides[name].x);}// o pouso do Rumo continua quando ele é o guia
- fig.dataset.state='celebrate';const run=track(name,animarGesto(fig,'celebrar',1));
- Promise.allSettled(run.map(r=>r.finished)).then(r=>{if(r.every(x=>x.status==='fulfilled'))fig.dataset.state='welcome';});
+function cheerOnce(name){const fig=figureOf(name);if(!fig)return;fig.dataset.state='celebrate';const run=track(name,animarGesto(fig,'celebrar',1));
+ Promise.allSettled(run.map(r=>r.finished)).then(r=>{if(r.every(x=>x.status==='fulfilled'))fig.dataset.state='welcome';});}
+// Na chegada (at, a parada nova): a parada concluída acende, o confete estoura sobre o Rumo e o guia da terra concluída comemora;
+// o Rumo comemora depois do pouso (quando ele é o guia, o gesto já é dele).
+const cheered=new Set();// fases já comemoradas nesta visita
+function celebratePhase(from,at){
+ const first=passage?.first!==false;popRing(from,FX.destrava);if(first)worldView?.confetti(at);const name=STEP_COMPANIONS[from],fig=figureOf(name);
+ if(fig&&name!=='rumo'){stopRuns(name);faceTo(fig,mapAnchors.rumo.x,mapAnchors.guides[name].x);}// o pouso do Rumo continua quando ele é o guia
+ cheerOnce(name);if(first&&name!=='rumo')later(()=>{if(passage)cheerOnce('rumo');},FX.pouso,'festa-rumo');
 }
+// Movimento reduzido ou pausa: o aviso aparece num fade curto (o mesmo do Rumo) e fica o tempo da passagem; Rumo e guia em pose.
+// QA M3: no mapa curto do celular (abaixo de 200 px) o aviso cobria o Rumo em qualquer lugar; ali o mesmo texto vai para a faixa de
+// mensagens da pergunta, que sai sozinha em 2,5 s.
+function quietCheer(from){
+ const st=$('world-stage'),note=$('world-viewport').querySelector('.passage-note'),figs=[...new Set(['rumo',STEP_COMPANIONS[from]])].map(figureOf).filter(Boolean);
+ if(shortStrip())status('experiment-status',`${note.firstChild.textContent}. ${note.lastChild.textContent}.`);
+ else{st.dataset.cheer='';note?.animate([{opacity:0},{opacity:1}],{duration:FX.fade});if(mapAnchors)layoutTags(mapAnchors);}
+ figs.forEach(f=>pose(f,'celebrar'));
+ later(()=>{delete st.dataset.cheer;figs.forEach(f=>pose(f,'repouso'));if(mapAnchors)layoutTags(mapAnchors);},FX.passagem,'festa-fase');
+}
+function endCheer(){const st=$('world-stage');if(!('cheer' in st.dataset))return;delete st.dataset.cheer;clearTimeout(mapTimers.get('festa-fase'));mapTimers.delete('festa-fase');MAP_CAST.map(figureOf).forEach(f=>f&&pose(f,'repouso'));if(mapAnchors)layoutTags(mapAnchors);}
 function closePassage(){
  const p=passage;if(!p?.el||p.closing)return;p.closing=true;worldView?.setKeep(null);$('world-stage').dataset.closing='';
  const back=p.el.animate(p.back,{duration:FX.fecha,easing:E.chega,fill:'forwards'});p.anims.push(back);
  back.finished.then(()=>{if(passage===p)endPassage();},()=>{});
 }
-function endPassage(){const p=passage;if(!p)return;passage=null;p.timers?.forEach(clearTimeout);p.anims?.forEach(a=>a.cancel());const st=$('world-stage');delete st.dataset.passage;delete st.dataset.closing;setTimeout(stageNote);}
-// Pular: o Rumo fica na parada nova, o guia volta ao repouso e o painel aparece sem transição.
+function endPassage(){const p=passage;if(!p)return;passage=null;p.timers?.forEach(clearTimeout);p.anims?.forEach(a=>a.cancel());const st=$('world-stage');delete st.dataset.passage;delete st.dataset.closing;if(mapAnchors)layoutTags(mapAnchors);setTimeout(stageNote);}
+// Pular: o Rumo fica na parada nova, o guia volta ao repouso, o confete sai e o painel aparece sem transição.
 function finishPassage(){
  const p=passage;if(!p?.el)return;const st=$('world-stage');
  if(worldView?.state().hop||worldView?.state().selected!==p.to)worldView?.select(p.to,{instant:true});
- stopRuns(STEP_COMPANIONS[p.from]);stopRuns('fx');st.dataset.instant='';endPassage();void st.offsetHeight;delete st.dataset.instant;
+ clearTimeout(mapTimers.get('festa-rumo'));mapTimers.delete('festa-rumo');worldView?.endConfetti();
+ stopRuns(STEP_COMPANIONS[p.from]);stopRuns('rumo');stopRuns('fx');st.dataset.instant='';endPassage();void st.offsetHeight;delete st.dataset.instant;
 }
 // Lote 5.8: um toque ou uma tecla terminam a entrada do desktop na parada atual, aproximando em 0,5 s. Toque no 3D e nos
 // botões da câmera fica com eles: o renderer escolhe a parada com a câmera que está na tela (QA A1) e "Voltar à parada" aproxima
@@ -423,20 +496,47 @@ addEventListener('pointerdown',e=>{if(!passage?.el)return;const s=e.target.close
 // QA M2: a tecla que pula a passagem não rola a página (o foco está no título da fase nova).
 addEventListener('keydown',e=>{if(!passage?.el)return;finishPassage();if([' ','Enter','ArrowDown','ArrowUp','PageDown','PageUp','Home','End'].includes(e.key))e.preventDefault();},true);
 // On document, so experiment.js has already collected the field when the map repaints.
-document.addEventListener('input',e=>{if(worldOwnsForm()&&e.target.closest('#experiment-form')){worldAutoStart=false;paintWorld();
+// Lote 5.11: respondido o campo, a mensagem do que faltava nele sai; nenhuma mensagem nova aparece enquanto se digita.
+document.addEventListener('input',e=>{if(worldOwnsForm()&&e.target.closest('#experiment-form')){worldAutoStart=false;clearMissing(n=>filled(lab.data[n]));paintWorld();
  // Pessoa digitando: o guia da terra faz a pose de pensar uma vez por parada.
  if(thoughtStep!==lab.step&&e.target.matches('textarea,input:not([type=radio]):not([type=checkbox])')){thoughtStep=lab.step;think();}}});
-document.addEventListener('change',e=>{if(worldOwnsForm()&&e.target.closest('#experiment-form'))paintWorld();});
+document.addEventListener('change',e=>{if(worldOwnsForm()&&e.target.closest('#experiment-form')){clearMissing(n=>filled(lab.data[n]));paintWorld();}});
 $('world-nodes').onclick=e=>{const name=e.target.closest('[data-name-of]'),button=name?name.previousSibling:e.target.closest('[data-world-stop]');if(button)goStop(Number(button.dataset.worldStop),button);};
 $('world-overview').onclick=()=>{if(!worldView)return;if(mapOpen&&worldView.state().overview){closeMap();return;}openMap();worldView.camera(worldView.state().overview?'focus':'center',{animate:true});};// Lote 5.8: no desktop, com zoom em movimento
 $('world-explore').onclick=()=>{if(!worldView)return;if(mapOpen&&worldView.state().exploring){closeMap();return;}openMap();worldView.setExplore(!worldView.state().exploring);};
 $('world-camera').querySelector('.world-adjust').onclick=e=>{const button=e.target.closest('[data-camera]');if(button)worldView?.camera(button.dataset.camera);};
 $('world-example').onclick=()=>{worldAutoStart=false;$('experiment-example').click();};
-$('world-restart').onclick=()=>{lab={owner:owner(),programa,step:0,data:{},started:true};labSaved=false;worldAutoStart=true;renderLabStep(0);focusLab();};
-window.addEventListener('mapa:saved',e=>{if(e.detail?.programa==='filho')worldCelebrationPending=e.detail;});
+$('world-restart').onclick=()=>{cheered.clear();lab={owner:owner(),programa,step:0,data:{},started:true};labSaved=false;worldAutoStart=true;renderLabStep(0);focusLab();};
+// Lote 5.11: guardar a trilha inteira no bosque abre, depois de gravar, a comemoração de tela cheia sobre a tela "Resposta
+// guardada" (experiment.js já foi para ela quando a microtarefa roda). Falha ao gravar não dispara o evento e não comemora.
+window.addEventListener('mapa:saved',e=>{if(e.detail?.programa!=='filho')return;worldCelebrationPending=e.detail;if(worldOwnsForm()&&current==='trilha')queueMicrotask(()=>openTrail(e.detail.recordId));});
+// O Rumo grande comemora (pop e o gesto do 5.3, duas vezes), o confete cai por até 5 s e o quadro fica parado, com o que a pessoa
+// fez: as duas possibilidades, a pergunta e o pequeno passo. "Continuar" está à vista desde o primeiro quadro e leva à tela
+// "Resposta guardada"; Esc também. Movimento reduzido ou pausa: o mesmo quadro, parado, com o Rumo na pose de comemorar.
+const trail=$('trail-done');let trailRuns=[];trail.querySelector('.trail-rumo').innerHTML=companion('rumo','welcome');
+function openTrail(id){
+ const r=answers().find(a=>a.id===id)?.experimento?.respostas;if(!r||current!=='pronta'||trail.open)return;
+ // QA M1: "Ainda não sei" não vira nome, pergunta nem passo no resumo: o nome volta a "Possibilidade A" (ou B), a pergunta sai e o
+ // passo fica com a ação escolhida.
+ const known=v=>filled(v)&&v!==DUNNO,plan=known(r.actionPlan)?r.actionPlan:r.action;
+ $('trail-done-summary').innerHTML=[['Você comparou',`${known(r.aName)?r.aName:'Possibilidade A'} e ${known(r.bName)?r.bName:'Possibilidade B'}`],['Sua pergunta',known(r.question)&&r.question],['Seu pequeno passo',plan]].filter(([,v])=>v).map(([t,v])=>`<div><dt>${t}</dt><dd>${esc(v)}</dd></div>`).join('');
+ trail.showModal();const fig=trail.querySelector('.trail-rumo .companion');
+ if(motionOff()){pose(fig,'celebrar');return;}
+ pose(fig,'repouso');const H=trail.clientHeight,layer=trail.querySelector('.trail-confetti');
+ layer.innerHTML=Array.from({length:48},(_,j)=>`<i style="left:${(j*37+11)%100}%;background:${LOW[j%5]}"></i>`).join('');
+ trailRuns=[trail.querySelector('.trail-rumo').animate([{transform:'scale(.6)',opacity:0},{transform:'scale(1)',opacity:1}],{duration:300,easing:E.mola}),
+  ...animarGesto(fig,'celebrar',1).map(a=>(a.effect.updateTiming({delay:300}),a)),...animarGesto(fig,'celebrar',1).map(a=>(a.effect.updateTiming({delay:1100}),a)),
+  // Cada peça cai uma vez, girando no plano (sem virar de face), e some ao chegar embaixo: a última termina antes de 5 s.
+  ...[...layer.children].map((p,j)=>{const dx=(j%7-3)*16;return p.animate([{transform:'translate(0,-24px) rotate(0deg)',opacity:1},{transform:`translate(${dx}px,${Math.round(H*.6)}px) rotate(${160+j*19}deg)`,opacity:1,offset:.65},{transform:`translate(${dx*1.4}px,${H+24}px) rotate(${260+j*29}deg)`,opacity:0}],{duration:2600+(j*173)%1500,delay:(j*97)%700,easing:'linear',fill:'both'});})];
+ // Depois do confete o Rumo fica parado na pose de comemorar.
+ Promise.allSettled(trailRuns.map(a=>a.finished)).then(r=>{if(trail.open&&r.every(x=>x.status==='fulfilled'))pose(fig,'celebrar');});
+}
+$('trail-done-ok').onclick=()=>trail.close();
+trail.addEventListener('close',()=>{trailRuns.forEach(a=>a.cancel());trailRuns=[];trail.querySelector('.trail-confetti').innerHTML='';
+ if(current==='pronta'){const h=$('pronta').querySelector('h1');h.tabIndex=-1;h.focus({preventScroll:true});}});
 // QA A1: as ações ficam no mesmo lugar ao trocar de pergunta. O segundo clique de um duplo clique (ou toque duplo), que o
 // navegador marca com detail > 1, não avança de novo nem grava a revisão sem que ela apareça.
-$('experiment-form').addEventListener('click',e=>{if(worldOwnsForm()&&e.detail>1&&e.target.closest('#experiment-next,#lab-skip,#part-skip,#experiment-back')){e.preventDefault();e.stopImmediatePropagation();}},true);
+$('experiment-form').addEventListener('click',e=>{if(worldOwnsForm()&&e.detail>1&&e.target.closest('#experiment-next,.field-dunno,#experiment-back')){e.preventDefault();e.stopImmediatePropagation();}},true);
 // Lote 5.5: o bosque ocupa uma tela na rota do Filho. --top-h é o cabeçalho preso no desktop (0 no celular, onde ele rola).
 const topBar=document.querySelector('.top');
 function measureTop(){const h=getComputedStyle(topBar).position==='sticky'?topBar.offsetHeight:0;document.documentElement.style.setProperty('--top-h',h+'px');return h;}
@@ -470,7 +570,8 @@ function markSeen(...keys){keys.forEach(k=>seenNow[k]=true);const v=read(SEEN_KE
 const STAGE_WHY={Mapear:'conhecer possibilidades antes de escolher',Analisar:'reunir informações e ver o que ainda falta saber',Priorizar:'escolher a dúvida que vale investigar primeiro',Agir:'planejar um passo pequeno e testar'};
 const ROLE={rumo:'eu ando com você pela trilha e ajudo na fase da Bifurcação.',bino:'eu ajudo nas fases da Clareira e do Moinho, a reparar no que te dá curiosidade.',
  pipa:'eu ajudo nas fases da Ponte e da Placa, a comparar possibilidades.',teo:'eu ajudo nas fases do Acampamento e do Mirante, a planejar um passo de cada vez.'};
-const LOOK_HELP={aqui:'A fase aberta agora.',feita:'A parte principal está respondida.',comecada:'Tem resposta, mas falta a parte principal.',depois:`Dá para voltar quando quiser. ${KEPT}`,fechada:'Abre quando você terminar a fase anterior.',aberta:'Ainda sem resposta. O número é a ordem da fase.'};
+// A legenda mostra os estados que a rota do Filho produz (Lote 5.11: sem "Deixada para depois").
+const LOOK_HELP={aqui:'A fase aberta agora.',feita:'Todos os passos estão respondidos.',comecada:'Tem resposta, mas ainda falta passo.',fechada:'Abre quando você terminar a fase anterior.',aberta:'Ainda sem resposta. O número é a ordem da fase.'};
 const tip=document.createElement('div');tip.id='world-tip';tip.className='world-tip';tip.popover='manual';tip.setAttribute('role','dialog');tip.setAttribute('aria-labelledby','world-tip-text');
 tip.innerHTML='<span class="tip-face" aria-hidden="true"></span><div class="tip-body"><p id="world-tip-text" class="tip-text"></p><div class="tip-foot"><span class="tip-count"></span><button type="button" class="tip-ok">Entendi</button></div></div>';
 $('bosque').append(tip);
@@ -526,9 +627,10 @@ function roleNote(name){
  openNote({kind:'papel',face:name,html:`<b>${ELENCO[name].name}:</b> ${ROLE[name]}`,target:()=>rectOf(fig),prefer:['above','below']});
  if(!motionOff()&&!mapRuns.get(name)?.some(a=>a.playState==='running'))track(name,animarGesto(fig,'acolher',1));
 }
-function lockedNote(i,from){
+// Lote 5.11: a fase espera todas as anteriores completas; quando a anterior está feita e falta uma mais atrás, o balão diz qual.
+function lockedNote(i,from,j=i-1){
  const target=from?()=>rectOf(from):()=>{const v=rectOf($('world-viewport')),p=mapAnchors?.stops[i];return p?new DOMRect(v.left+p.x-22,v.top+p.y-44,44,44):v;};
- openNote({kind:'fechada',html:`<b>Fase ${i+1} de 7 · ${STOPS[i].place}</b> Abre quando você terminar a fase anterior.`,target,prefer:['above','below']});
+ openNote({kind:'fechada',html:`<b>Fase ${i+1} de 7 · ${STOPS[i].place}</b> Abre quando você terminar ${j<0||j===i-1?'a fase anterior':`a fase ${j+1}, ${STOPS[j].place}`}.`,target,prefer:['above','below']});
 }
 // QA M2 (17/10): o segundo clique de um duplo clique (ou toque duplo) em "Entendi" não pula a dica seguinte.
 tip.querySelector('.tip-ok').onclick=e=>{if(e.detail>1)return;if(note?.kind==='dica')nextTip();else closeNote();};
@@ -544,7 +646,7 @@ function paintGuide(){
  const sample=l=>`<span class="world-node" data-look="${l}" aria-hidden="true"><span class="node-glyph">${l==='fechada'?LOCK:LOOK_GLYPH[l]||(l==='aqui'?'1':'2')}</span></span>`;
  // QA M8 (17/10): "Fechar" fica preso no topo da legenda, à vista sem rolar. QA M10: a cor de cada etapa ao lado do nome, a
  // mesma da borda das fases na fila.
- guide.innerHTML=`<div class="guide-head"><h2 id="world-guide-title">Como ler a trilha</h2><button type="button" class="back" id="guide-close">Fechar</button></div><ul class="guide-looks">${Object.keys(LOOK_TEXT).map(l=>`<li>${sample(l)}<span><b>${LOOK_TEXT[l]}</b><small>${LOOK_HELP[l]}</small></span></li>`).join('')}</ul>`+
+ guide.innerHTML=`<div class="guide-head"><h2 id="world-guide-title">Como ler a trilha</h2><button type="button" class="back" id="guide-close">Fechar</button></div><ul class="guide-looks">${Object.keys(LOOK_HELP).map(l=>`<li>${sample(l)}<span><b>${LOOK_TEXT[l]}</b><small>${LOOK_HELP[l]}</small></span></li>`).join('')}</ul>`+
   `<h3>As 4 etapas</h3><p class="guide-note">A borda de cada fase na fila tem a cor da etapa dela.</p><ul class="guide-stages">${MARCAS.map(m=>`<li><span class="stage-dot land-${m.land}" aria-hidden="true"></span><span><b>${m.id}:</b> ${STAGE_WHY[m.id]}.</span></li>`).join('')}</ul>`+
   `<h3>Quem é quem</h3><ul class="guide-cast">${['rumo','bino','pipa','teo'].map(n=>`<li><span class="tip-face" aria-hidden="true">${companion(n,'welcome')}</span><span><b>${ELENCO[n].name}:</b> ${ROLE[n]}</span></li>`).join('')}</ul>`+
   '<div class="guide-actions"><button type="button" class="btn" id="guide-tips">Ver as dicas de novo</button></div>';
