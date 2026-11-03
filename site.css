@@ -267,9 +267,9 @@ html:has(#bosque:not([hidden])){scroll-padding-top:var(--top-h,78px)}
 #world-stage .part-text{font-weight:800;color:var(--ink)}
 /* Passagem de fase: o painel desce e some em 200 ms enquanto o mapa cresce (o JS anima a altura, ou a largura deitado); na
    volta, sobe. data-instant tira as transições quando um toque pula a passagem. */
-#world-stage :is(.world-place-head,.companion-stage,.world-status,#experiment-fields,#experiment-status,.experiment-actions,.world-note){transition:opacity .2s cubic-bezier(.2,.8,.2,1),transform .2s cubic-bezier(.2,.8,.2,1)}
+#world-stage :is(.world-place-head,.companion-stage,.world-status,#experiment-fields,#experiment-status,.experiment-actions,.world-note,.mundo-fields,.mundo-status,.mundo-actions){transition:opacity .2s cubic-bezier(.2,.8,.2,1),transform .2s cubic-bezier(.2,.8,.2,1)}
 #world-stage::before,#world-stage .world-camera,.passage-note{transition:opacity .2s}
-#world-stage[data-passage]:not([data-closing]) :is(.world-place-head,.companion-stage,.world-status,#experiment-fields,#experiment-status,.experiment-actions,.world-note){opacity:0;transform:translateY(24px);pointer-events:none}
+#world-stage[data-passage]:not([data-closing]) :is(.world-place-head,.companion-stage,.world-status,#experiment-fields,#experiment-status,.experiment-actions,.world-note,.mundo-fields,.mundo-status,.mundo-actions){opacity:0;transform:translateY(24px);pointer-events:none}
 #world-stage[data-passage]:not([data-closing])::before{opacity:0}
 #world-stage[data-passage] .world-camera{opacity:0;pointer-events:none}
 #world-stage[data-passage=wide] .world-scene{grid-column:1/-1;justify-self:start;z-index:2}
@@ -424,10 +424,10 @@ html:has(#bosque:not([hidden])){scroll-padding-top:var(--top-h,78px)}
 /* Mensagens da pergunta (rascunho, exemplo, erro, fase concluída): uma faixa sobre a base da área da pergunta, logo acima das
    ações, sem empurrar o passo (QA M1). O que não é erro sai sozinho em 2,5 s, depois de anunciado (world-bridge.js). */
 #world-stage[data-phase]{position:relative}
-#world-stage[data-phase] #experiment-status{position:absolute;left:12px;right:12px;bottom:4px;z-index:1;margin:0;padding:6px 12px;border:2px solid var(--line);border-radius:12px;background:var(--cream);box-shadow:0 2px 0 var(--line-deep)}
-#world-stage[data-phase] #experiment-status:empty{display:none}
+#world-stage[data-phase] :is(#experiment-status,.mundo-status){position:absolute;left:12px;right:12px;bottom:4px;z-index:1;margin:0;padding:6px 12px;border:2px solid var(--line);border-radius:12px;background:var(--cream);box-shadow:0 2px 0 var(--line-deep)}
+#world-stage[data-phase] :is(#experiment-status,.mundo-status):empty{display:none}
 /* QA M9 (17/10): a faixa de mensagem não segura o toque no campo que ela cobre. */
-#world-stage[data-phase] #experiment-status{pointer-events:none}
+#world-stage[data-phase] :is(#experiment-status,.mundo-status){pointer-events:none}
 /* Lote 5.8: com o mapa mais alto, os passos mais altos de 1280×720 (revisão, 4.2 e 6.1) perdiam a folga. Só no desktop:
    nos opcionais a frase faz o papel da dica e o primeiro bloco fica a 12 px dela; escolhas com menos opções que colunas
    ocupam a linha (o texto cabe numa linha só); cada bloco da revisão fica numa linha, com título, estado e Editar. */
@@ -445,8 +445,8 @@ html:has(#bosque:not([hidden])){scroll-padding-top:var(--top-h,78px)}
    posição conta a partir do bloco inteiro (item de grade com área usa a área como referência). Vale a partir de 1200 px, onde o
    mapa ficou alto: em 1024×768 a dica de exploração tinha três linhas e cobria o Rumo (QA M4); ali fica como no 5.7. */
 @media(min-width:1200px){
- #world-stage[data-phase] :is(#experiment-status,.world-status){grid-area:auto;position:absolute;left:50%;right:auto;top:calc(6px + var(--mapa-h) - 10px);bottom:auto;z-index:3;width:max-content;max-width:min(600px,calc(100% - 600px));margin:0;padding:6px 12px;border:2px solid var(--line);border-radius:12px;background:var(--cream);box-shadow:0 2px 0 var(--line-deep);transform:translate(-50%,-100%)}
- #world-stage[data-phase] .world-status:empty,#world-stage[data-phase]:has(#experiment-status:not(:empty)) .world-status{display:none}
+ #world-stage[data-phase] :is(#experiment-status,.mundo-status,.world-status){grid-area:auto;position:absolute;left:50%;right:auto;top:calc(6px + var(--mapa-h) - 10px);bottom:auto;z-index:3;width:max-content;max-width:min(600px,calc(100% - 600px));margin:0;padding:6px 12px;border:2px solid var(--line);border-radius:12px;background:var(--cream);box-shadow:0 2px 0 var(--line-deep);transform:translate(-50%,-100%)}
+ #world-stage[data-phase] .world-status:empty,#world-stage[data-phase]:has(:is(#experiment-status,.mundo-status):not(:empty)) .world-status{display:none}
 }
 /* Lote 5.8: a lupa do "Ver bosque" aparece só no desktop; no celular os botões da câmera precisam caber numa linha (Lote 5.5). */
 .cam-icon{display:none}
@@ -574,3 +574,91 @@ body[data-programa=filho] #trilha :is(.station-degree,.dock-bearing,.map-directi
 .guide-actions{display:flex;flex-wrap:wrap;gap:10px;margin-top:16px}
 .guide-actions .back{min-height:44px}
 @media(prefers-reduced-motion:reduce){.world-guide-open{transition:none}}
+/* Lote 6.1: os mundos da exploração e o parque aquático. O painel do mundo ocupa as mesmas áreas da pergunta do 5.5 (fields, labstatus, actions): o leiaute do bloco não muda. */
+#world-stage .mundo-fields{grid-area:fields;align-self:stretch;min-height:0;overflow-y:auto;margin-top:4px;padding:4px 20px 12px;container-type:inline-size}
+#world-stage .mundo-fields h1{font-size:22px;line-height:1.2;letter-spacing:-.02em;margin:2px 0 6px}
+#world-stage .mundo-fields>.eyebrow{margin:0}
+#world-stage .mundo-fields p{font-size:15px;line-height:1.45;margin:0 0 8px}
+/* A mensagem do mundo segue as regras da do laboratório (5.7 e 5.8, acima): faixa sobre a base do painel, logo acima das ações, e no
+   desktop de 1200 px ou mais na base do mapa. No fluxo da grade ela encolhia o painel (20 a 50 px de rolagem em 1280 a 1920) e em
+   390×568 cruzava as ações (1ª volta do Y, QA M1 e A2). */
+#world-stage .mundo-status{grid-area:labstatus;margin:0 20px 8px;font-size:14px}
+#world-stage .mundo-status:empty{display:none}
+#world-stage .mundo-actions{grid-area:actions;align-self:stretch;display:flex;align-items:center;justify-content:flex-end;gap:10px;margin:0;padding:10px 14px 12px 12px;border-top:2px solid var(--line)}
+#world-stage .mundo-actions:empty{display:none}
+#world-stage .mundo-actions :is(.btn,.back){min-width:0;min-height:44px;padding:10px 16px;font-size:15px}
+/* As ações do mundo com o mesmo respiro das ações da pergunta em cada tamanho (regras do 5.5 acima). Sem isso a faixa de ações ficava
+   10 a 14 px mais alta no celular e deitado, e a área do painel menor que a do 5.7 (2ª volta do Y, diagonal-cenario). */
+@media(max-width:899px){#world-stage .mundo-actions{padding:8px 14px}}
+@media(max-width:599px){#world-stage .mundo-actions{gap:8px;padding:6px 12px}}
+@media(max-height:640px) and (min-aspect-ratio:4/3){#world-stage .mundo-actions{padding:4px 12px}}
+#world-stage .mundo-actions .back{margin-right:auto}
+#world-stage .mundo-exemplo{display:inline-block;padding:0 8px;border:2px dashed var(--ink);border-radius:999px;background:var(--white);color:var(--ink);font-size:14px;font-weight:900;line-height:1.4;white-space:nowrap}
+.mundo-lacuna{display:inline;padding:0 4px;border-radius:6px;background:var(--cream);color:var(--muted);font-style:italic;font-size:14px}
+.mundo-sub{font-weight:800}
+.mundo-prep{display:flex;align-items:center;gap:10px}
+.mundo-prep .node-glyph{display:grid;place-items:center;flex:none;width:44px;height:44px;border:2px dashed var(--ink);border-radius:50%;font-weight:900}
+#world-stage .mundo-fields .mundo-conta{color:var(--muted)}
+.mundo-lugares{list-style:none;display:grid;grid-template-columns:repeat(auto-fill,minmax(min(100%,180px),1fr));gap:8px;margin:8px 0 0;padding:0}
+.mundo-lugar{display:flex;align-items:center;gap:10px;width:100%;min-height:52px;padding:6px 12px 6px 6px;border:2px solid var(--line);border-radius:var(--radius-control);background:var(--white);color:var(--ink);font:inherit;text-align:left;cursor:pointer;box-shadow:0 3px 0 var(--line-deep)}
+.mundo-lugar .node-glyph{display:grid;place-items:center;flex:none;width:36px;height:36px;border:2px solid var(--ink);border-radius:50%;font-weight:900;background:var(--white)}
+.mundo-lugar[data-feito=true] .node-glyph{background:var(--leaf);border-color:var(--leaf-deep);color:var(--ink)}
+.mundo-lugar>span{min-width:0;overflow-wrap:anywhere}.mundo-lugar b{display:block;font-size:15px}
+.mundo-lugar small{display:block;font-size:14px;color:var(--muted);font-weight:800}
+.mundo-lugar:focus-visible,.mundo-pro:focus-visible,.mundo-tirar:focus-visible{outline:3px solid var(--ink);outline-offset:2px}
+@media(hover:hover){.mundo-lugar:hover,.mundo-pro:not([data-on]):hover{background:var(--cream)}}
+.mundo-lugar:active,.mundo-pro:active{transform:translateY(2px);box-shadow:0 1px 0 var(--line-deep)}
+.mundo-equipe{margin:6px 0 8px;padding:6px 10px;min-height:44px;border:2px dashed var(--ink);border-radius:var(--radius-control);background:var(--white)}
+.mundo-equipe[data-over],.mundo-equipe[data-pick]{border-style:solid;background:var(--cream)}
+.mundo-equipe[data-falta]{border-color:var(--coral-deep)}
+#world-stage .mundo-fields .mundo-equipe-titulo{display:inline-flex;flex-wrap:wrap;align-items:baseline;gap:0 10px;margin:0 8px 0 0;vertical-align:middle}
+.mundo-equipe-titulo small{font-size:14px;color:var(--muted);font-weight:800}
+.mundo-time{list-style:none;display:inline-flex;flex-wrap:wrap;gap:6px;margin:0;padding:0;vertical-align:middle}
+.mundo-time:empty{display:none}
+.mundo-time li{display:flex;align-items:center;gap:6px;padding:0 0 0 6px;border:2px solid var(--line);border-radius:999px;background:var(--white);font-size:14px;font-weight:900}
+.mundo-time .pro-fig{width:24px;height:24px}
+.mundo-tirar{width:44px;height:44px;border:0;border-radius:50%;background:none;color:var(--ink);font:900 20px/1 var(--font);cursor:pointer}
+.mundo-por{width:100%;margin-top:6px}
+.mundo-fala{position:relative;margin:4px 0 8px;padding:8px 12px;border:2px solid var(--ink);border-radius:14px;background:var(--white)}
+#world-stage .mundo-fields .mundo-fala p{margin:0}
+#world-stage .mundo-fields .mundo-fala p+p{margin-top:4px}
+.mundo-vol{display:flex;flex-wrap:wrap;gap:8px;margin-top:8px}
+.mundo-vol :is(.btn,.back){min-height:44px;padding:8px 14px;font-size:15px}
+#world-stage .mundo-fields .mundo-dica{font-size:14px;color:var(--muted)}
+.mundo-pros{list-style:none;display:grid;grid-template-columns:repeat(auto-fill,minmax(min(100%,150px),1fr));gap:8px;margin:0;padding:0}
+.mundo-pro{display:flex;align-items:center;gap:8px;width:100%;min-height:52px;padding:6px 10px;border:2px solid var(--ink);border-radius:var(--radius-control);background:var(--white);color:var(--ink);font:inherit;font-size:14px;font-weight:900;line-height:1.2;text-align:left;cursor:grab;touch-action:none;user-select:none;box-shadow:0 3px 0 var(--line-deep)}
+.mundo-pro .pro-fig{flex:none;width:32px;height:32px}
+.mundo-pro small{display:block;font-size:14px;font-weight:800;color:var(--ink)}
+.mundo-pro>span{display:block;min-width:0;overflow-wrap:anywhere}
+.mundo-pro[aria-pressed=true]{background:var(--sun);border-color:var(--ink)}
+.mundo-pro[data-on]{border-style:dashed;border-color:var(--line-deep);box-shadow:none;cursor:default}
+.mundo-pro[data-dragging]{opacity:.4}
+.mundo-ghost{position:fixed;left:0;top:0;z-index:50;pointer-events:none;box-shadow:0 8px 0 rgba(28,39,68,.2)}
+.mundo-pergunta{margin:6px 0 8px;padding:0;border:0}
+.mundo-pergunta legend{font-size:17px;font-weight:900;line-height:1.35;margin-bottom:8px}
+.mundo-simnao{display:flex;gap:10px}
+.mundo-simnao .back{min-width:96px;min-height:44px}
+.mundo-simnao [aria-pressed=true]{background:var(--ink);color:var(--white)}
+.mundo-sintese-titulo{font-size:16px;margin:8px 0 4px}
+.mundo-sintese{display:grid;grid-template-columns:repeat(auto-fill,minmax(min(100%,150px),1fr));gap:4px 16px;margin:0}
+.mundo-sintese div{padding:4px 0;border-bottom:2px solid var(--line)}
+.mundo-sintese dt{font-weight:900;font-size:14px}
+.mundo-sintese dd{margin:0;font-size:14px}
+/* O parque abre no mesmo quadro do bosque; o bosque, os personagens, a câmera e as dicas saem enquanto ele está aberto. */
+.world-viewport .park-canvas{cursor:pointer}
+#world-stage:not([data-park]) .world-viewport>.park-canvas,#world-stage:not([data-park]) .park-tags{display:none}
+#world-stage[data-park] .world-viewport>canvas:not(.park-canvas),#world-stage[data-park] .world-viewport>img,#world-stage[data-park] .world-layer,#world-stage[data-park] .passage-note,#world-stage[data-park] :is(#world-camera,#world-guide-open){display:none}
+#world-stage[data-park] .world-viewport{background:#3a6690}
+.park-tags{position:absolute;inset:0;z-index:1;overflow:hidden;pointer-events:none}
+.park-tag{position:absolute;left:0;top:0;display:flex;flex-direction:column;align-items:center;padding:1px 8px;border:2px solid var(--line);border-radius:12px;background:var(--white);color:var(--ink);font-size:14px;font-weight:900;line-height:1.2;white-space:nowrap}
+.park-tag small{font-size:14px;font-weight:800}
+.park-tag[data-feito=true]{border-color:var(--leaf-deep)}
+/* QA B4 (6.1): no celular o nome do lugar e o do profissional cabem no cartão; deitado e até 360 px o desenho do profissional sai do cartão (fica na equipe). */
+@media(max-width:599px){.mundo-lugar{gap:8px;padding-left:4px}.mundo-lugar .node-glyph{width:30px;height:30px}.mundo-lugar b{font-size:14px}.mundo-pro{padding:6px 8px;gap:6px}}
+@media(max-width:374px),(max-height:640px) and (min-aspect-ratio:4/3){.mundo-pros .pro-fig{display:none}}
+@media(max-width:599px){#world-stage .mundo-fields{padding:4px 12px 10px}#world-stage .mundo-fields h1{font-size:20px}#world-stage .mundo-fields[data-view=lugar] h1{font-size:18px}#world-stage .mundo-fields p{font-size:14px}.mundo-lugares,.mundo-pros{grid-template-columns:repeat(2,minmax(0,1fr))}.mundo-lugar{padding-right:6px}.park-tag small{display:none}}
+@media(max-height:640px) and (min-aspect-ratio:4/3){#world-stage .mundo-fields{padding:2px 16px 8px}#world-stage .mundo-fields h1{font-size:18px}#world-stage .mundo-fields[data-view=lugar] h1{font-size:16px}#world-stage .mundo-fields[data-view=lugar]>.eyebrow{display:none}#world-stage .mundo-lugares{grid-template-columns:repeat(2,minmax(0,1fr))}#world-stage .mundo-fields .mundo-dica{position:absolute;width:1px;height:1px;margin:-1px;overflow:hidden;clip-path:inset(50%);white-space:nowrap}.mundo-pro,.mundo-lugar{min-height:44px}.mundo-lugares,.mundo-pros{grid-template-columns:repeat(3,minmax(0,1fr))}.park-tag small{display:none}}
+@media (min-width:700px) and (min-height:641px),(min-width:700px) and (max-aspect-ratio:4/3){#world-stage .mundo-fields[data-view=lugar]{display:grid;grid-template-columns:minmax(0,1fr) minmax(0,1fr);column-gap:24px;align-content:start;align-items:start}#world-stage .mundo-fields[data-view=lugar]>*{grid-column:1/-1}#world-stage .mundo-fields[data-view=lugar]>.mundo-dica{grid-column:1;grid-row:3}#world-stage .mundo-fields[data-view=lugar]>.mundo-pros{grid-column:1;grid-row:4/7;grid-template-columns:repeat(2,minmax(0,1fr))}#world-stage .mundo-fields[data-view=lugar]>.mundo-equipe{grid-column:2;grid-row:3/5;margin-top:0}#world-stage .mundo-fields[data-view=lugar]>.mundo-fala{grid-column:2;grid-row:5;margin-top:0}#world-stage .mundo-fields[data-view=lugar] h1{font-size:20px}}
+@media (min-width:1100px) and (min-height:641px){#world-stage .mundo-fields[data-view=lugar]{grid-template-columns:minmax(0,1.1fr) minmax(0,1fr) minmax(0,1fr)}#world-stage .mundo-fields[data-view=lugar]>.mundo-fala{grid-column:3;grid-row:3/7}#world-stage .mundo-fields[data-view=lugar]>.mundo-equipe{grid-row:3/7}}
+@media (min-width:700px) and (min-height:641px),(min-width:700px) and (max-aspect-ratio:4/3){#world-stage .mundo-fields[data-view=fechamento]{display:grid;grid-template-columns:minmax(0,1fr) minmax(0,1fr);column-gap:32px;align-content:start;align-items:start}#world-stage .mundo-fields[data-view=fechamento]>*{grid-column:1}#world-stage .mundo-fields[data-view=fechamento]>:is(.mundo-sintese-titulo,.mundo-sintese){grid-column:2}#world-stage .mundo-fields[data-view=fechamento]>.mundo-sintese-titulo{grid-row:1;margin-top:2px}#world-stage .mundo-fields[data-view=fechamento]>.mundo-sintese{grid-row:2/6}}
+@media(max-width:599px) and (max-height:700px) and (orientation:portrait){#world-stage .mundo-fields[data-view=lugar] h1{font-size:16px}#world-stage .mundo-fields[data-view=lugar]>.eyebrow{display:none}}

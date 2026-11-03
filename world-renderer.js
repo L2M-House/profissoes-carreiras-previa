@@ -1,4 +1,5 @@
 import * as T from 'three';
+import './parque-renderer.js';// Lote 6.1: o mapa do parque aquatico, no mesmo bundle
 // Lote 5.9 (adendo): the colour grade runs in the tone mapping of each material, with no extra pass. A soft shoulder per channel
 // above .85 rolls off the lit tops that used to clip, and leaves every colour below it as the kit has it (PBR Neutral, tried
 // first, took the trail from #fff5de to #f2e7cd and the blue out of the sun); on top, cool shadows and warm lights, the cool kept

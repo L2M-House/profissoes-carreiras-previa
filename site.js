@@ -39,7 +39,7 @@ function show(id,{replace=false,focus=true,fromHistory=false}={}){
  if(!VIEWS.includes(id))id='inicio';
  if(id==='aula'&&session()?.papel!=='anai')id='entrar';
  if((id==='licao'&&!aberta)||(id==='pronta'&&!saved))id='trilha';
- stopCompanionMotion();if($("helper-dialog").open)$("helper-dialog").close();if($('trail-done').open)$('trail-done').close();current=id;document.body.dataset.view=id;
+ stopCompanionMotion();if($("helper-dialog").open)$("helper-dialog").close();current=id;document.body.dataset.view=id;
  VIEWS.forEach(v=>$(v).hidden=v!==id);
  if(id==='trilha')renderCourse();
  if(id==='painel')paintPainel();
@@ -56,7 +56,7 @@ function show(id,{replace=false,focus=true,fromHistory=false}={}){
  if(focus&&heading){heading.tabIndex=-1;heading.focus({preventScroll:true});}window.refreshWorld?.();
  if(id==='trilha'&&programa==='filho')window.scrollToWorld?.();// Lote 5.5: a rota do Filho para no bloco do bosque
 }
-function setPrograma(p){programa=p==='filho'?'filho':'pais';document.body.dataset.programa=programa;document.querySelector('.map-overview-title').textContent=programa==='filho'?'Aulas da Anaí em cada etapa':'As quatro etapas do MAPA';$('dock-lab').hidden=programa==='filho';$('tab-pais').setAttribute('aria-pressed',programa==='pais');$('tab-filho').setAttribute('aria-pressed',programa==='filho');$('trail-description').textContent=programa==='pais'?'Pais · visão geral das quatro etapas.':'Filho · sete fases no bosque. Toque numa delas para responder.';}
+function setPrograma(p){programa=p==='filho'?'filho':'pais';document.body.dataset.programa=programa;document.querySelector('.map-overview-title').textContent=programa==='filho'?'Aulas da Anaí em cada etapa':'As quatro etapas do MAPA';$('dock-lab').hidden=programa==='filho';$('tab-pais').setAttribute('aria-pressed',programa==='pais');$('tab-filho').setAttribute('aria-pressed',programa==='filho');$('trail-description').textContent=programa==='pais'?'Pais · visão geral das quatro etapas.':'Filho · sete mundos da exploração. Toque num deles para entrar.';}
 function courseHTML(){return `<div class="row ${programa==='filho'?'has-substeps':''}">${MARCAS.map((m,i)=>`${i&&programa==='filho'?'<span class="tick" aria-hidden="true"></span><span class="tick" aria-hidden="true"></span>':''}<div class="stop land-${m.land}"><button type="button" class="station" data-stage="${m.id}" aria-pressed="${selectedMark===m.id}" aria-label="${m.nome}, ${m.verbo}">${m.id==='Analisar'?`<span class="pin">${rumo()}</span>`:''}<img src="media/mapa/${m.art}.svg" class="stage-art" width="72" height="72" alt=""><span class="gem"><em>${i+1}</em></span><span class="station-degree">${m.deg}</span><b>${m.id}</b><small>${m.verbo}</small></button></div>`).join('')}</div>`;}
 function renderCourse(){setPrograma(programa);$('trail').innerHTML=courseHTML();paintDock();paintAvatar();paintScrollHint();window.refreshWorld?.();}
 function paintScrollHint(){const t=$('trail');document.querySelector('.map-scroll-hint').hidden=t.scrollWidth<=t.clientWidth+1;}

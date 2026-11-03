@@ -40,6 +40,9 @@ function prioritySelect(){return select('firstValue',`Qual prioridade gostaria d
 function sourceField(){const t=labData().searchType;return t&&t!=='Definir depois'?field('sourcePlan',t==='Conversar'?'Com que tipo de pessoa ou contexto poderia aprender?':t==='Pesquisar'?'Que fonte pretende consultar?':'O que gostaria de ver acontecendo?',{type:'textarea',optional:true,placeholder:'Não inclua nome, telefone ou contato pessoal.'}):'';}
 function limitChoices(){['activities','values'].forEach(name=>{const els=[...$('experiment-form').querySelectorAll(`[name="${name}"]`)];const count=els.filter(x=>x.checked).length;els.forEach(el=>el.disabled=count>=3&&!el.checked);const counter=$(name+'-count');if(counter)counter.textContent=`${count} de até 3 selecionadas`;});}
 // Lote 5.11: uma resposta "Ainda não sei" (rota do Filho) não é usada como nome nem como dúvida nas perguntas seguintes.
+// Lote 6.1: DUNNO morava na parte da ponte que andava pelas fases; com as fases fora do bosque, o laboratório guarda a própria (rascunhos antigos
+// da rota do Filho ainda podem trazer o texto).
+const DUNNO='Ainda não sei';
 const known=v=>v&&v!==DUNNO?v:'';
 function stepValid(){return Journey.validStep(lab.step,labData());}
 // Lote 5.7: o passo 1 de cada fase do bosque usa a mesma checagem antes de abrir o passo seguinte.
