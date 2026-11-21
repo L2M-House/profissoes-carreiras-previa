@@ -4,6 +4,9 @@
 // equipe, ou com Enter no teclado. Cada um diz o que faria ali; o fora do esperado ganha a explicação; o prioritário que falta
 // se oferece uma vez ("não esquece de mim"). Nenhuma escolha é errada, não há pontos. Com todos os lugares com equipe, o
 // fechamento pergunta sim ou não, mostra a lista do que ela montou e conclui o mundo com a comemoração do 5.11.
+// Lote 6.2: entrar e sair do mundo têm uma passagem de até 0,8 s (a câmera do bosque aproxima da miniatura e o parque abre por cima; ao
+// sair, o inverso, com o Rumo no lugar). O painel já está pronto no primeiro quadro, e um toque ou uma tecla terminam a passagem;
+// movimento reduzido e pausa trocam direto. Os rótulos do mapa nunca cobrem as peças: do cartão ao selo, o que couber.
 const PARK_ID='parque-aquatico';
 const park={open:false,view:'parque',lugar:-1,pick:null,fala:null,key:''};
 let parkView=null,parkFailed=false;
@@ -67,29 +70,56 @@ function paintPlaces(c,m){
  const list=$('park-places');if(list.children.length!==c.lugares.length)list.innerHTML=c.lugares.map((l,i)=>`<li><button type="button" class="world-node land-leaf" data-park-lugar="${i}" data-k="place-${i}"></button><span class="node-name" aria-hidden="true"><b>${esc(l.nome)}</b><small></small></span></li>`).join('');
  c.lugares.forEach((l,i)=>{const b=list.children[i].firstChild,t=Mundos.equipe(m,l.id).length,look=park.view==='lugar'&&park.lugar===i?'aqui':t?'feita':'aberta';b.dataset.look=look;b.innerHTML=`<span class="node-glyph">${t?'✓':i+1}</span>`;
   b.toggleAttribute('aria-current',look==='aqui');b.setAttribute('aria-label',`Lugar ${i+1} de ${c.lugares.length}, ${l.nome}: ${t?`equipe com ${t}`:'sem equipe'}`);list.children[i].lastChild.lastChild.textContent=look==='aqui'?'Você está aqui':t?'Com equipe':'Sem equipe';});
- parkView?.paint(c.lugares.map(l=>({feito:Mundos.lugarFeito(m,l.id)})));parkView?.select(park.view==='lugar'?park.lugar:-1);
- const tags=$('world-viewport').querySelector('.park-tags');if(tags&&!tags.children.length)tags.innerHTML=c.lugares.map((l,i)=>`<span class="park-tag" data-i="${i}"><b>${esc(l.nome)}</b><small></small></span>`).join('');
- tags?.querySelectorAll('.park-tag').forEach((t,i)=>{const n=Mundos.equipe(m,c.lugares[i].id).length;t.lastChild.textContent=n?'✓ Com equipe':'Sem equipe';t.dataset.feito=String(n>0);});
+ parkView?.paint(c.lugares.map(l=>({feito:Mundos.lugarFeito(m,l.id),equipe:Mundos.equipe(m,l.id).map(id=>PRO_COLOR[id]||'#5e6880')})));parkView?.select(park.view==='lugar'?park.lugar:-1);
+ const tags=$('world-viewport').querySelector('.park-tags');if(tags&&!tags.children.length)tags.innerHTML=c.lugares.map((l,i)=>`<span class="park-tag" data-i="${i}"><b>${esc(l.nome)}</b><small></small><i></i></span>`).join('');
+ tags?.querySelectorAll('.park-tag').forEach((t,i)=>{const n=Mundos.equipe(m,c.lugares[i].id).length,aqui=park.view==='lugar'&&park.lugar===i;t.children[1].textContent=aqui?'Você está aqui':n?'✓ Com equipe':'Sem equipe';t.children[2].textContent=n?'✓':i+1;t.dataset.feito=String(n>0);t.toggleAttribute('data-aqui',aqui);});
  if(parkView)layoutParkTags(parkView.anchors());
 }
-// Os rótulos ficam sobre cada lugar, sem sair do quadro; um que encostaria em outro já posto não aparece (a lista tem todos).
+// Lote 6.2: um rótulo nunca cobre as peças de um lugar nem outro rótulo. Em cima do lugar, embaixo, dos lados ou nos cantos, o que primeiro
+// couber, do mais completo ao menor: cartão com o nome e o estado, só o nome, ou o selo com o número ou o ✓ (o mesmo da fila). O lugar aberto vem
+// primeiro. O que não couber em nenhum lugar não aparece: a lista e a fila têm todos.
 function layoutParkTags(a){
- const tags=$('world-viewport').querySelector('.park-tags');if(!tags||!park.open)return;const taken=[];
- a.lugares.forEach((p,i)=>{const t=tags.children[i];if(!t)return;const w=t.offsetWidth,h=t.offsetHeight,r={x:Math.round(p.x-w/2),y:Math.round(p.y-h-4),w,h};
-  const ok=r.x>=2&&r.y>=2&&r.x+w<=a.width-2&&r.y+h<=a.height-2&&!taken.some(q=>r.x<q.x+q.w+4&&q.x<r.x+w+4&&r.y<q.y+q.h+2&&q.y<r.y+h+2);
-  t.style.visibility=ok?'':'hidden';if(ok){taken.push(r);t.style.transform=`translate(${r.x}px,${r.y}px)`;}});
+ const tags=$('world-viewport').querySelector('.park-tags');if(!tags||!park.open)return;const boxes=a.lugares.map(p=>p.box),order=a.lugares.map((_,k)=>k).sort((x,y)=>(y===a.selected)-(x===a.selected));
+ const gapTo=(c,q)=>Math.hypot(Math.max(0,q.x0-c.x-c.w,c.x-q.x1),Math.max(0,q.y0-c.y-c.h,c.y-q.y1)),over=(r,q)=>r.x<q.x1+2&&q.x0-2<r.x+r.w&&r.y<q.y1+2&&q.y0-2<r.y+r.h;
+ // QA A3 e M12: o rótulo fica colado no lugar. Vale o mais perto, com um pouco de vantagem para o mais completo; longe do lugar (mais de
+ // 28 px da caixa dele) ele nomeava o vizinho, e então não aparece; nem quando outro lugar fica tão perto dele quanto o dele (medido com a
+ // largura de tela sem arredondar, a mesma do teste; com offsetWidth, 1 px de arredondamento virava a decisão em 1440×900). 4ª rodada
+ // do Y: no celular em pé metade dos lugares ficava sem rótulo; se faltar rótulo, a mesma busca só com selos, que ocupam menos, fica
+ // valendo quando mostra mais lugares.
+ const run=levels=>{const taken=[],out=[],free=r=>r.x>=2&&r.y>=2&&r.x+r.w<=a.width-2&&r.y+r.h<=a.height-2&&!boxes.some(q=>over(r,q))&&!taken.some(q=>over(r,q));
+  for(const i of order){const t=tags.children[i],q=boxes[i];if(!t)continue;let best=null;
+   for(const [n,nivel] of ['cheio','nome','selo'].entries()){if(!levels.includes(nivel))continue;t.dataset.nivel=nivel;const {width:w,height:h}=t.getBoundingClientRect(),mx=(q.x0+q.x1)/2,my=(q.y0+q.y1)/2;
+    for(let d=-120;d<=120;d+=12)for(const [x,y] of [[mx-w/2+d,q.y0-h-3],[mx-w/2+d,q.y1+3],[q.x1+3,my-h/2+d/3],[q.x0-w-3,my-h/2+d/3]]){const c={x:Math.round(x),y:Math.round(y),w,h},gap=gapTo(c,q),score=gap+n*8+Math.abs(c.x+w/2-mx)/20+(c.y>q.y1?6:0);
+     if(gap<=28&&boxes.every((o,k)=>k===i||gapTo(c,o)>gap)&&(!best||score<best.score)&&free(c))best={...c,score,nivel};}}
+   out[i]=best;if(best)taken.push({x0:best.x,x1:best.x+best.w,y0:best.y,y1:best.y+best.h});}
+  return out;};
+ const shown=r=>r.filter(Boolean).length;let r=run(['cheio','nome','selo']);if(shown(r)<order.length){const s=run(['selo']);if(shown(s)>shown(r))r=s;}
+ order.forEach(i=>{const t=tags.children[i],b=r[i];if(!t)return;if(b)t.dataset.nivel=b.nivel;t.style.visibility=b?'':'hidden';if(b)t.style.transform=`translate(${b.x}px,${b.y}px)`;});
 }
+// A passagem: uma só de cada vez, e terminar é sempre o mesmo caminho (fim natural, toque, tecla, pausa, sair da rota).
+// Os 0,8 s contam do toque: a primeira montagem do parque sai do tempo da passagem (1ª volta do Y: 873 ms com 800 fixos), que não fica abaixo de 0,35 s.
+const PASS_MS=760;let parkPass=null,passMs=PASS_MS;
+function endParkPass(){const p=parkPass;if(!p)return;parkPass=null;p.anims.forEach(x=>x.cancel());delete $('world-stage').dataset.parkPass;p.done();}
+function startParkPass(dir,anims,done){$('world-stage').dataset.parkPass=dir;parkPass={anims:anims.filter(Boolean),done};parkPass.anims[0].onfinish=endParkPass;}
+const passAnim=(e,frames)=>e?.animate(frames,{duration:passMs,easing:E.chega,fill:'both'});
+const canPass=()=>!motionOff()&&worldView&&!worldFailed&&parkView&&!parkFailed&&mapLayer;
+addEventListener('pointerdown',endParkPass,true);addEventListener('keydown',endParkPass,true);
 function openPark(){
- const c=parkContent();if(!c)return;endTips();closeNote(true);finishPassage();park.open=true;park.view='parque';park.lugar=-1;park.pick=null;park.fala=null;
- worldView?.setActive(false);const vp=$('world-viewport');
+ const c=parkContent();if(!c)return;const t0=performance.now();endTips();closeNote(true);finishPassage();park.open=true;park.view='parque';park.lugar=-1;park.pick=null;park.fala=null;
+ const vp=$('world-viewport');
  if(!vp.querySelector('.park-tags')){const t=document.createElement('div');t.className='park-tags';t.setAttribute('aria-hidden','true');vp.append(t);}
  if(!parkView&&!parkFailed&&window.Parque&&!worldFailed){try{parkView=Parque.create(vp,{lugares:c.lugares,onPick:i=>openLugar(i),onFrame:layoutParkTags,onError:m=>{parkFailed=true;setWorldStatus(m);}});window.parkWorld=parkView;}catch{parkFailed=true;}}
  if(!parkView&&!worldFailed)setWorldStatus('O mapa 3D do parque não abriu. Os lugares estão na lista.');
- paintWorld();parkView?.render();focusMundo();$('world-live').textContent='Você entrou no parque aquático.';
+ parkView?.setMotion(!motionOff());parkView?.setActive(true);paintWorld();parkView?.render();focusMundo();$('world-live').textContent='Você entrou no parque aquático.';
+ passMs=Math.max(350,PASS_MS-(performance.now()-t0));if(canPass()&&worldView.dive(0,passMs/1000-.06)){const c=vp.querySelector('.park-canvas'),tags=vp.querySelector('.park-tags'),closed={opacity:0,transform:'scale(1.16)'},open={opacity:1,transform:'scale(1)'};
+  startParkPass('in',[passAnim(c,[closed,{...closed,offset:.4},open]),passAnim(tags,[{opacity:0},{opacity:0,offset:.7},{opacity:1}]),passAnim(mapLayer,[{opacity:1},{opacity:0,offset:.25},{opacity:0}])],()=>worldView.setActive(false));}
+ else worldView?.setActive(false);
 }
 function closePark(instant=false){
- if(!park.open)return;park.open=false;park.pick=null;park.fala=null;$('world-stage').removeAttribute('data-park');$('park-places').hidden=true;$('world-nodes').hidden=false;
- if(instant)return;if(worldView&&!worldFailed){worldView.setActive(true);worldView.render();}paintWorld();
+ if(!park.open)return;endParkPass();const pass=!instant&&canPass();park.open=false;park.pick=null;park.fala=null;$('world-stage').removeAttribute('data-park');$('park-places').hidden=true;$('world-nodes').hidden=false;parkView?.setActive(false);
+ if(instant){worldView?.emerge(0);return;}if(worldView&&!worldFailed){worldView.setActive(true);passMs=PASS_MS;worldView.emerge(0,pass?passMs/1000-.06:0);}paintWorld();
+ if(pass){const c=$('world-viewport').querySelector('.park-canvas'),open={opacity:1,transform:'scale(1)'},closed={opacity:0,transform:'scale(1.16)'};
+  startParkPass('out',[passAnim(c,[open,{...closed,offset:.6},closed]),passAnim(mapLayer,[{opacity:0},{opacity:0,offset:.6},{opacity:1}])],()=>worldView.emerge(0));}
 }
 function openLugar(i){if(!park.open)return;park.view='lugar';park.lugar=i;park.pick=null;park.fala=null;paintWorld();focusMundo();}
 // QA B5: quando a fala (ou a oferta) abre e não cabe, o painel desce até ela; se o corte cairia no meio do lugar ou da atividade,
@@ -176,6 +206,7 @@ $('world-stage').addEventListener('click',e=>{
  // QA M1, B1 e B2: o segundo clique de um toque duplo (detail > 1) não repete a ação nem cai no botão que apareceu embaixo.
  if(e.detail>1&&e.target.closest('[data-park],[data-vol],[data-lugar],[data-park-lugar],[data-fecho],[data-por],[data-tirar]'))return;
  const t=e.target;
+ if(t.closest('.park-tag')){openLugar(Number(t.closest('.park-tag').dataset.i));return;}
  if(t.closest('[data-park-lugar]')){openLugar(Number(t.closest('[data-park-lugar]').dataset.parkLugar));return;}
  const a=t.closest('[data-park]')?.dataset.park;
  if(a==='abrir'){openPark();return;}if(a==='mundo1'){goStop(0);return;}if(a==='trilha'){closePark();focusMundo();return;}if(a==='parque'){park.view='parque';const was=park.lugar;park.lugar=-1;park.fala=null;park.pick=null;status('mundo-status','');paintWorld();if(!focusLugar(was))focusMundo();return;}

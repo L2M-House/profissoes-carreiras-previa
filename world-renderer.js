@@ -31,19 +31,16 @@ const TRAIL=Array.from({length:37},(_,i)=>{const k=(i-12)/2,a=(k-3)*DX,b=i%2?SWA
 // Lote 5.8: behind Mirante, Téo was the top of "Ver bosque" and squeezed the climb; in front, he stands below it.
 // Pipa flies .45 above the bridge (it was .6): with the climb she stands higher than Bino, and the focus of Clareira and
 // Moinho zooms out to keep her whole on wide strips (see frameFocus); lower, it zooms out less.
+// Lote 6.2: the river moved to the stretch after stop 2; Pipa stays behind that stop, in the same place, by its bank. Over the moved river she
+// touched Rumo at stop 3 in "Ver a trilha toda" on a phone (a body cannot be 1.3 from two stops at the 46 px floor).
 // [stop, behind (negative: in front), sideways]
 const GUIDE_AT={bino:[0,3,-.2],teo:[6,-2.6,.3]},PIPA_UP=2.3,PIPA_Y=.45;
 const FIGURE_UNITS=1.55;// same as the bridge: drawing height in world units, with a box of 46 to 130 px
 // Rumo's walk: a short crouch, then a run whose duration grows slower than the distance (farther = faster).
 const ANTES=.09,runTime=du=>.22+.24*Math.sqrt(du);
 const hash=(a,b)=>{const h=Math.sin(a*127.1+b*311.7)*43758.5453;return h-Math.floor(h);};
-window.Bosque={create(host,{onSelect,onError,onView=()=>{},onFrame=()=>{},onWalk=()=>{}}){
- const scene=new T.Scene(),camera=new T.OrthographicCamera(-6,6,4,-4,.1,80);
- const renderer=new T.WebGLRenderer({antialias:true,alpha:true});
- renderer.setPixelRatio(Math.min(devicePixelRatio,Math.min(innerWidth,innerHeight)<600?1.5:2));// phone in either orientation: 1.5 (QA B5)renderer.outputColorSpace=T.SRGBColorSpace;
- renderer.toneMapping=T.CustomToneMapping;renderer.info.autoReset=false;// Lote 5.9: the grade above; render() sums the draw calls of its passes
- const canvas=renderer.domElement;canvas.style.removeProperty('display');canvas.setAttribute('role','img');canvas.setAttribute('aria-label','Bosque em três dimensões com sete paradas numa trilha. Use também a lista de paradas.');host.prepend(canvas);
- scene.add(new T.HemisphereLight('#fffdf9','#245b39',1.8));const sun=new T.DirectionalLight('#fff1d0',2.2);sun.position.set(-4,8,5);scene.add(sun);
+// Lote 6.2: the park of world 1 uses the same shaders, light and foot shade as the forest: one set per scene, from here.
+const vivo=()=>{
  // Lote 5.9: the scene lives in its shaders, on one set of uniforms. uT is the life clock (it slows in the calm and stops with
  // the ambient), uAmp the wind (0 still, 1 full), uGust the gust of a tapped stop (x, z, strength, age), uBloom the flowers
  // opening in a phase passage (x, z, on, age), uCloud the shadows of three clouds (x, z, radius) and uLake the middle of the
@@ -81,14 +78,26 @@ void RE_IndirectDiffuse_Lambert(const in vec3 irradiance,const in vec3 geometryP
    .replace('#include <project_vertex>',`vec4 wp=vec4(transformed,1.);\n#ifdef USE_INSTANCING\nwp=instanceMatrix*wp;\n#endif\nwp=modelMatrix*wp;${MOVE[mode]||''}vWorld=wp.xyz;vec4 mvPosition=viewMatrix*wp;gl_Position=projectionMatrix*mvPosition;`);
   s.fragmentShader=s.fragmentShader.replace('#include <common>','#include <common>\n'+SHADE+(mode==='particle'?'varying float vGlow;':'')).replace('#include <lights_lambert_pars_fragment>',LIGHT).replace('#include <opaque_fragment>','outgoingLight*=cloudShade(vWorld.xz);'+(FRAG[mode]||'')+FOG+'\n#include <opaque_fragment>');};
   m.customProgramCacheKey=()=>'vivo-'+mode;return m;}
+ return {U,patch};
+};
+// Lote 5.9 (adendo): false occlusion per vertex, darker toward the foot of a shape. Sloan et al. (2013) bake it per class of
+ // instanced tree; here it is the local height, on the vertex colours: no cost in the shader.
+function footShade(g,k0=.55,top=.7){const p=g.attributes.position,c=new Float32Array(p.count*3);g.computeBoundingBox();const {min,max}=g.boundingBox;for(let i=0;i<p.count;i++)c.fill(k0+(1-k0)*T.MathUtils.smoothstep(p.getY(i),min.y,min.y+(max.y-min.y)*top),i*3,i*3+3);g.setAttribute('color',new T.BufferAttribute(c,3));return g;}
+const radial=()=>{const c=document.createElement('canvas');c.width=c.height=64;const g=c.getContext('2d'),r=g.createRadialGradient(32,32,0,32,32,32);r.addColorStop(0,'#fff');r.addColorStop(.45,'rgba(255,255,255,.6)');r.addColorStop(1,'rgba(255,255,255,0)');g.fillStyle=r;g.fillRect(0,0,64,64);return new T.CanvasTexture(c);};
+window.BosqueKit={vivo,footShade,radial};
+window.Bosque={create(host,{onSelect,onError,onView=()=>{},onFrame=()=>{},onWalk=()=>{}}){
+ const scene=new T.Scene(),camera=new T.OrthographicCamera(-6,6,4,-4,.1,80);
+ const renderer=new T.WebGLRenderer({antialias:true,alpha:true});
+ renderer.setPixelRatio(Math.min(devicePixelRatio,Math.min(innerWidth,innerHeight)<600?1.5:2));// phone in either orientation: 1.5 (QA B5)renderer.outputColorSpace=T.SRGBColorSpace;
+ renderer.toneMapping=T.CustomToneMapping;renderer.info.autoReset=false;// Lote 5.9: the grade above; render() sums the draw calls of its passes
+ const canvas=renderer.domElement;canvas.style.removeProperty('display');canvas.setAttribute('role','img');canvas.setAttribute('aria-label','Bosque em três dimensões com sete paradas numa trilha. Use também a lista de paradas.');host.prepend(canvas);
+ scene.add(new T.HemisphereLight('#fffdf9','#245b39',1.8));const sun=new T.DirectionalLight('#fff1d0',2.2);sun.position.set(-4,8,5);scene.add(sun);
+ const {U,patch}=vivo();
  const mat=(color,extra={})=>patch(new T.MeshLambertMaterial({color,flatShading:true,...extra}));
  // water: lighter ink so the river reads as water, not as a hole (DESIGN.md, Lote 5.2)
  const colors={grass:'#69ae72',light:'#90be7c',high:'#51925d',earth:'#2b6946',rock:'#9b9a77',wood:'#8e603b',plank:'#bb8c52',leaf:'#1d6b49',leaf2:'#38935b',water:'#3a6690',path:'#fff5de',ivory:'#fffdf9',coral:'#f2534a',coralDeep:'#d63c38',sun:'#ffc83d',ink:'#1c2744'};
  const palette=Object.fromEntries(Object.entries(colors).map(([k,c])=>[k,mat(c)]));
  const box=new T.BoxGeometry(1,1,1),round=new T.DodecahedronGeometry(.6,0),prism=new T.CylinderGeometry(.34,.34,.62,3);
- // Lote 5.9 (adendo): false occlusion per vertex, darker toward the foot of a shape. Sloan et al. (2013) bake it per class of
- // instanced tree; here it is the local height, on the vertex colours: no cost in the shader.
- function footShade(g,k0=.55,top=.7){const p=g.attributes.position,c=new Float32Array(p.count*3);g.computeBoundingBox();const {min,max}=g.boundingBox;for(let i=0;i<p.count;i++)c.fill(k0+(1-k0)*T.MathUtils.smoothstep(p.getY(i),min.y,min.y+(max.y-min.y)*top),i*3,i*3+3);g.setAttribute('color',new T.BufferAttribute(c,3));return g;}
  const batches=new Map(),dummy=new T.Object3D();
  // Lote 5.8: LIFT is the ground of the stop whose landmark is being placed, above .35, and MARK that landmark's box (see on()):
  // every piece placed while it holds adds its box, and "Ver bosque" frames them all whole (QA M2: the binoculars of the Mirante left
@@ -111,6 +120,9 @@ void RE_IndirectDiffuse_Lambert(const in vec3 irradiance,const in vec3 geometryP
  const trail=Array.from({length:601},(_,i)=>curve.getPointAt(i/600));
  const stops=STOP_U.map((u,index)=>{const p=curve.getPointAt(u),t=curve.getTangentAt(u);return {index,u,x:p.x,y:p.y,z:p.z,side:new T.Vector3(-t.z,0,t.x).normalize()};}),targets=[];
  const span=STOP_U[6]-STOP_U[0];
+ // Lote 6.2 (decision 1 of the plan): the river and the bridge stay as scenery away from the stops, on the stretch between the worlds 3
+ // and 4, at the swing of the trail, where it runs almost square to the river. BR is that point; stop 2 used to stand on the bridge.
+ const BR={u:lengths[1700]/lengths[3600]};{const p=curve.getPointAt(BR.u);BR.x=p.x;BR.y=p.y;BR.z=p.z;}
  const nearest=(x,z)=>{let d=1e9,i=0;for(let k=0;k<trail.length;k+=2){const q=Math.hypot(trail[k].x-x,trail[k].z-z);if(q<d){d=q;i=k;}}return {d,p:trail[i],i};};
  // Lote 5.8: where the trail climbs, the hexagons under it sit a little lower than its middle, by the rise over the .6 that a
  // cap spans each way, so no cap comes up through the trail.
@@ -119,7 +131,7 @@ void RE_IndirectDiffuse_Lambert(const in vec3 irradiance,const in vec3 geometryP
  const behind=(x,z,p)=>ST(x,z)[1]<ST(p.x,p.z)[1];
  // The river follows the 60° axis of the hexagons: on screen it runs straight up and down and meets the trail square on, under
  // the bridge of Ponte. `fromRiver` is the distance across it, from the middle of its two rows of hexagons.
- const RV=[.5,Math.sqrt(3)/2],RN=[Math.sqrt(3)/2,-.5],riverP=stops[2].x*RN[0]+stops[2].z*RN[1],fromRiver=(x,z)=>Math.abs(x*RN[0]+z*RN[1]-riverP);
+ const RV=[.5,Math.sqrt(3)/2],RN=[Math.sqrt(3)/2,-.5],riverP=BR.x*RN[0]+BR.z*RN[1],fromRiver=(x,z)=>Math.abs(x*RN[0]+z*RN[1]-riverP);
  const guides=Object.fromEntries(Object.entries(GUIDE_AT).map(([name,[a,back,side]])=>{const p=curve.getPointAt(STOP_U[a]),[s,t]=ST(p.x,p.z),[x,z]=W(s+side,t-back);return [name,new T.Vector3(x,.35,z)];}));
  guides.pipa=new T.Vector3(stops[2].x-RV[0]*PIPA_UP,.35,stops[2].z-RV[1]*PIPA_UP);const order=['bino','pipa','teo'];for(const n of order){const v=guides[n];delete guides[n];guides[n]=v;}
  const clearSpots=[...stops,...Object.values(guides)];
@@ -127,12 +139,16 @@ void RE_IndirectDiffuse_Lambert(const in vec3 irradiance,const in vec3 geometryP
  const [lakeS,lakeT]=ST(stops[0].x,stops[0].z),[lakeX,lakeZ]=W(lakeS-2.4,lakeT-2.7),LAKE_Y=stops[0].y+.48,inLake=(x,z)=>Math.hypot(x-lakeX,z-lakeZ)<1.05;
  // The mill and the lookout deck reach past the path level onto the first terrace behind their stop; the ground under them
  // stays at the stop's level, so no terrace hexagon comes up through them (QA B3 of Lote 5.8).
- const flatAt=(i,u,v,r)=>{const s=stops[i],t=curve.getTangentAt(s.u),ry=Math.atan2(-t.z,t.x);return {x:s.x+u*Math.cos(ry)+v*Math.sin(ry),z:s.z-u*Math.sin(ry)+v*Math.cos(ry),r,y:s.y};},FLAT=[flatAt(1,.35,-1.75,1.7),flatAt(6,-.6,-1.2,1.45)];
+ // Lote 6.2: the place of each world beside its stop, behind the trail and to the right of it on screen, so Rumo in front of his stop does not
+ // hide it: [right on screen, toward the camera, radius]. The river takes the right of stop 2. The mill stands behind the site of world 2, on
+ // the ground of its stop, as scenery; the ground under each place keeps the level of its stop (QA B3 of Lote 5.8).
+ const SITE=[[.95,-1.15,.8],[.8,-1.7,.62],[-.1,-1.34,.56],[.8,-1.7,.62],[.85,-1.16,.62],[.8,-1.7,.62],[.85,-1.16,.62]],besideStop=(i,ds,dt)=>{const [s,t]=ST(stops[i].x,stops[i].z);return W(s+ds,t+dt);};
+ const siteAt=SITE.map(([ds,dt,r],i)=>{const [x,z]=besideStop(i,ds,dt);return {x,z,r,y:stops[i].y};}),[mx,mz]=besideStop(1,-.35,-3),FLAT=[{x:mx,z:mz,r:1.6,y:stops[1].y},...siteAt.map(p=>({...p,r:p.r+.85}))];
  // Hex field shifted so the river line falls between two rows of hexagons: the river is two hexagons wide.
  const HX=Math.sqrt(3)*.58,ox=(riverP-.87*(Math.round(riverP/.87-.5)+.5))/RN[0],tiles=[],tileAt=new Map();
  // Ground heights follow the trail (Lote 5.8): terraces behind it, and in front the ground steps down .55 at a time to the
  // meadow, so the climb of Analisar to Agir shows as hills with the Mirante on top.
- const height=(x,z)=>{if(fromRiver(x,z)<.5)return .13;if(inLake(x,z))return LAKE_Y;const flat=FLAT.find(q=>Math.hypot(x-q.x,z-q.z)<q.r);if(flat)return flat.y;const {d,p,i}=nearest(x,z),g=p.y;if(d<1)return g-drop[i];
+ const height=(x,z)=>{if(fromRiver(x,z)<.5)return .13;if(inLake(x,z))return LAKE_Y;const {d,p,i}=nearest(x,z),g=p.y;if(d<1)return g-drop[i];const flat=FLAT.find(q=>Math.hypot(x-q.x,z-q.z)<q.r);if(flat)return flat.y;
   if(behind(x,z,p))return d<1.9?g:d<4.6?g+.6:g+1.25;const f=d<1.9?g:Math.max(.35,g-.55*Math.ceil((d-1.9)/1.5));return d>5&&hash(Math.round(x),Math.round(z))<.3?Math.max(f,.95):f;};
  for(let r=-40;r<=40;r++)for(let q=-40;q<=40;q++){const x=HX*(q+r/2)+ox,z=.87*r,[s,t]=ST(x,z);if(s<FIELD.s[0]-1||s>FIELD.s[1]+1||t<FIELD.t[0]-1||t>FIELD.t[1]+1)continue;
   const tile={q,r,x,z,s,t,height:height(x,z)};tiles.push(tile);tileAt.set(q+','+r,tile);}
@@ -165,27 +181,20 @@ void RE_IndirectDiffuse_Lambert(const in vec3 irradiance,const in vec3 geometryP
  // Landmarks in a frame turned like the trail at their stop: u along the trail, v toward the camera. Lote 5.8: each one stands
  // on the ground of its stop; part() adds LIFT to every piece placed while on(i) holds it.
  const frameAt=(s,ry=Math.atan2(-curve.getTangentAt(s.u).z,curve.getTangentAt(s.u).x))=>({ry,at:(u,v)=>[s.x+u*Math.cos(ry)+v*Math.sin(ry),s.z-u*Math.sin(ry)+v*Math.cos(ry)]});
- const landmarks={},markBox={},on=(i,name)=>{LIFT=i<0?0:stops[i].y-.35;MARK=name?(markBox[name]??=[]):null;};
+ const landmarks={},markBox={},on=(i,name,y=stops[i]?.y)=>{LIFT=i<0?0:y-.35;MARK=name?(markBox[name]??=[]):null;};
  // Lote 5.9: two birds perch on the landmark of each stop ([x, y, z, facing]); the camp has two lanterns on posts.
  const perch=stops.map(()=>[]),lanterns=[];let chimney,pinAt;
- // Bridge (Possibilidades: one bank for each possibility), long enough to cross the river on the slant of the trail; the planks
- // follow the climb of the trail across it.
- {const s=stops[2],{ry,at}=frameAt(s);landmarks.ponte=[s.x,s.z];on(-1,'ponte');
-  for(let i=-10;i<=10;i++){const [x,z]=at(i*.125,0);beam(x,nearest(x,z).p.y-.035,z,.12,.07,1.05,palette.plank,ry);}on(2,'ponte');
-  for(const v of [-.6,.6]){const [x,z]=at(0,v);beam(x,.77,z,2.6,.065,.065,palette.wood,ry);for(const u of [-1.2,-.4,.4,1.2]){const [px,pz]=at(u,v);beam(px,.51,pz,.075,.65,.075,palette.wood,ry);}}
-  for(const u of [-1.05,1.05]){const [x,z]=at(u,0);beam(x,-.05,z,.12,.75,.7,palette.wood,ry);}
-  for(const u of [-.75,.5]){const [x,z]=at(u,-.6);perch[2].push([x,.81+LIFT,z,ry+(u<0?0:Math.PI)]);}}
- function bench(x,z,ry){const c=Math.cos(ry),sn=Math.sin(ry);beam(x,.58,z,.85,.09,.35,palette.plank,ry);beam(x-.16*sn,.86,z-.16*c,.85,.29,.07,palette.plank,ry);for(const dx of [-.3,.3])beam(x+dx*c,.43,z-dx*sn,.07,.3,.25,palette.wood,ry);}
- // Clearing: bench and compass sign behind the trail (Curiosidades).
- {on(0,'banco');const s=stops[0],{ry,at}=frameAt(s),[bx,bz]=at(-.75,-.95);bench(bx,bz,ry);landmarks.banco=[bx,bz];
-  for(const d of [-.22,.2])perch[0].push([bx+d*Math.cos(ry)-.16*Math.sin(ry),1.01+LIFT,bz-d*Math.sin(ry)-.16*Math.cos(ry),ry+(d<0?Math.PI:0)]);
-  const [x,z]=at(.75,-.55);beam(x,.63,z,.045,.55,.045);part(new T.CylinderGeometry(.16,.16,.03,8),palette.ivory,x,.94,z,1,1,1,0,0,Math.PI/2);part(new T.ConeGeometry(.07,.22,3),palette.sun,x,.94,z+.02);}
- // Mill behind Moinho, to the right of the stop (Prioridades).
- on(1,'moinho');const {at:millAt}=frameAt(stops[1]),[mx,mz]=millAt(.35,-1.75);landmarks.moinho=[mx,mz];
+ // Bridge between the worlds 3 and 4: planks over the river, following the climb of the trail, with rails and posts on the same slope.
+ {const {ry,at}=frameAt(BR),slope=(stops[3].y-stops[2].y)/(2*DX);landmarks.ponte=[BR.x,BR.z];on(-1,'ponte');
+  for(let i=-8;i<=8;i++){const [x,z]=at(i*.125,0);beam(x,nearest(x,z).p.y-.035,z,.12,.07,1.05,palette.plank,ry);}on(2,'ponte',BR.y);
+  for(const v of [-.6,.6]){const [x,z]=at(0,v);beam(x,.77,z,2.1,.065,.065,palette.wood,ry,slope);for(const u of [-.95,-.32,.32,.95]){const [px,pz]=at(u,v);beam(px,.51+u*slope,pz,.075,.65,.075,palette.wood,ry);}}
+  for(const u of [-.9,.9]){const [x,z]=at(u,0);beam(x,-.05+u*slope,z,.12,.75,.7,palette.wood,ry);}}
+ // Mill behind the stop and the site of world 2: scenery, away from the stop since Lote 6.2.
+ on(1,'moinho');landmarks.moinho=[mx,mz];
  beam(mx,.9,mz,.9,1.1,.8,palette.ivory);beam(mx,.42,mz,.98,.16,.88,palette.rock);
  for(const [z,rot]of [[mz-.28,-.62],[mz+.28,.62]])beam(mx,1.56,z,1.12,.08,.68,palette.coral,0,0,rot);
  beam(mx,1.09,mz+.411,.25,.38,.025,palette.ink);beam(mx+.27,.67,mz+.416,.22,.52,.03);
- beam(mx-.33,1.75,mz-.15,.15,.45,.17,palette.ivory);chimney=[mx-.33,2+LIFT,mz-.15];{const [ax,az]=millAt(.1,-1),[bx2,bz2]=millAt(.55,-.95);perch[1].push([ax,stops[1].y+.02,az,A0],[bx2,stops[1].y+.02,bz2,A0+Math.PI]);}// QA A3: on the ground before the mill (the roof left the short map)
+ beam(mx-.33,1.75,mz-.15,.15,.45,.17,palette.ivory);chimney=[mx-.33,2+LIFT,mz-.15];
  const millBox={x:[mx-.62,mx+1.05],z:[mz-.5,mz+.6],y:[.35+LIFT,2.05+LIFT]};
  const wheel=new T.Group();wheel.name='roda-do-moinho';wheel.position.set(mx+.5,.63+LIFT,mz+.18);scene.add(wheel);
  const wheelShape=new T.BufferGeometry(),wv=[],wi=[];
@@ -193,33 +202,63 @@ void RE_IndirectDiffuse_Lambert(const in vec3 irradiance,const in vec3 geometryP
  wheelShape.setAttribute('position',new T.Float32BufferAttribute(wv,3));wheelShape.setIndex(wi);wheelShape.computeVertexNormals();
  wheel.add(new T.Mesh(wheelShape,mat(colors.wood,{side:T.DoubleSide})));
  const spokes=new T.InstancedMesh(box,palette.plank,6);for(let i=0;i<6;i++){dummy.position.set(0,0,0);dummy.scale.set(.14,.84,.055);dummy.rotation.set(i*Math.PI/3,0,0);dummy.updateMatrix();spokes.setMatrixAt(i,dummy.matrix);}wheel.add(spokes);
- // Lookout deck and binoculars (Revisão: looking back at the whole trail), beside the trail behind the last stop: the trail
- // goes on past it now, and would cover a deck built on the stop (QA B1).
- on(6,'mirante');const [lx,lz]=frameAt(stops[6]).at(-.6,-1.2),look={x:lx,z:lz};landmarks.mirante=[look.x,look.z];
- for(const dx of [-.58,.58])for(const dz of [-.52,.52])beam(look.x+dx,.19,look.z+dz,.09,.55,.09);
- for(let i=-4;i<=4;i++)beam(look.x+i*.14,.321,look.z,.13,.065,1.3,palette.plank);
- for(const dz of [-.56,.56]){beam(look.x+.66,.58,look.z+dz,.07,.5,.07);beam(look.x+.66,.84,look.z,.07,.07,1.2);}perch[6].push([look.x+.66,.885+LIFT,look.z-.3,A0],[look.x+.66,.885+LIFT,look.z+.28,A0+Math.PI]);
- const bx=look.x+.35,bz=look.z-.15;
- // Lote 5.8: a lower railing and a viewer at a child's height, nearer the middle of the deck: on the high point, at the top right
- // of "Ver bosque", the old ones left the top edge at 1280×720 and 1366×768 (QA M2).
- beam(bx,.655,bz,.09,.55,.09);beam(bx,.91,bz,.48,.08,.14,palette.ink);
- const tube=new T.CylinderGeometry(.14,.16,.45,8),lens=new T.CylinderGeometry(.1,.1,.02,8);
- for(const dz of [-.16,.16]){part(tube,palette.ink,bx,.95,bz+dz,1,1,1,0,Math.PI/2);part(lens,palette.sun,bx+.23,.95,bz+dz,1,1,1,0,Math.PI/2);}
- // Notice board (Informações), fork with three arrows (Uma dúvida), camp (Próximo passo), behind their stops.
- const at=(stop,d)=>[stop.x-stop.side.x*d,stop.z-stop.side.z*d];
- // Lote 5.9: two notes pinned by the top edge of the board flutter in the wind; the post of the fork carries a pinwheel.
- {on(3,'placa');const [x,z]=at(stops[3],.78);landmarks.placa=[x,z];for(const dx of [-.22,.22])beam(x+dx,.62,z,.06,.6,.06);beam(x,.84,z,.62,.36,.05,palette.ivory);for(const dy of [-.07,.05])beam(x,.84+dy,z+.03,.42,.035,.02,palette.ink);
-  for(const [dx,top,h,m] of [[-.13,.97,.17,palette.sun],[.15,.95,.13,palette.coral]]){const y0=top+LIFT;SWAY=(vx,vy)=>Math.max(0,Math.min(1,(y0-vy)/h));beam(x+dx,top-h/2,z+.04,.13,h,.012,m);}SWAY=0;
-  perch[3].push([x-.2,1.03+LIFT,z,A0],[x+.18,1.03+LIFT,z,A0+Math.PI]);}
- {on(4,'bifurcacao');const s=stops[4],[x,z]=at(s,.78);landmarks.bifurcacao=[x,z];beam(x,.75,z,.06,.8,.06);[[palette.coral,.25,1.05],[palette.sun,-.6,.9],[palette.leaf2,1.3,.75]].forEach(([m,ry,y])=>beam(x+Math.cos(ry)*.16,y,z-Math.sin(ry)*.16,.38,.1,.05,m,ry));
-  beam(x,1.2,z,.03,.16,.03);pinAt=[x,1.29+LIFT,z+.03];
-  for(const ry of [.7,-.5]){const d=new T.Vector3(1,0,0).applyAxisAngle(new T.Vector3(0,1,0),Math.atan2(-curve.getTangentAt(s.u).z,curve.getTangentAt(s.u).x)+ry);beam(s.x+d.x*.75,.358,s.z+d.z*.75,.7,.012,.34,palette.path,Math.atan2(-d.z,d.x));}}
- // Camp: tent, pole, the stones of the campfire and two logs to sit on (the flames are scenery of Agir, below).
- // Lote 5.9: the cloth of the tent ripples (the higher, the freer), two lanterns stand lit on posts, birds sit on the logs.
- {on(5,'acampamento');const [x,z]=at(stops[5],.8),y0=.3+LIFT;landmarks.acampamento=[x,z];SWAY=(vx,vy)=>Math.max(0,Math.min(1,(vy-y0)/.66))*.7;part(prism,palette.sun,x,.62,z,1,1,1,.4,Math.PI/2);SWAY=0;beam(x+.32,.56,z-.12,.05,.36,.05);part(new T.CylinderGeometry(.09,.12,.08,6),palette.rock,x-.1,.4,z+.5);
-  beam(x-.55,.41,z+.42,.42,.1,.12,palette.wood,.7);beam(x+.22,.41,z+.8,.42,.1,.12,palette.wood,-.5);
-  for(const [dx,dz] of [[.62,-.2],[-.6,-.12]]){beam(x+dx,.52,z+dz,.04,.5,.04);lanterns.push([x+dx,.82+LIFT,z+dz]);}
-  perch[5].push([x-.55,.47+LIFT,z+.42,.7],[x+.22,.47+LIFT,z+.8,Math.PI-.5]);}
+ // Lote 6.2 (decision 1): the stops hold only what is built on them. The notice board, the fork, the camp and the lookout left, and
+ // each world has a construction site with its sign. What lived on the old landmarks stays on the site of the same land: the notes in
+ // the wind on the sign of world 4, the pinwheel on world 5, the cloth over the materials and the two lanterns on world 6.
+ // Every piece faces the camera, in screen axes around the site (du to the right, dv toward the camera); y is above the pad.
+ const sand=mat('#d3b27c'),hexPad=new T.CylinderGeometry(1,1,1,6).rotateY(Math.PI/6),coneSite=new T.ConeGeometry(.5,1,6);
+ const siteY=siteAt.map(({x,z},i)=>Math.max(stops[i].y,...tiles.filter(t=>Math.hypot(t.x-x,t.z-z)<SITE[i][2]+.3).map(t=>t.height)));
+ function onSite(i){const c=siteAt[i],at=(du,dv)=>[c.x+du*R0[0]+dv*N0[0],c.z+du*R0[1]+dv*N0[1]];on(i,'mundo'+(i+1),siteY[i]);landmarks['mundo'+(i+1)]=[c.x,c.z];
+  return {at,box(du,dv,y,sx,sy,sz,m,rz=0){const [x,z]=at(du,dv);part(box,m,x,.35+y,z,sx,sy,sz,A0,rz);},geo(g,du,dv,y,sx,sy,sz,m){const [x,z]=at(du,dv);part(g,m,x,.35+y,z,sx,sy,sz,A0);},
+   // Two birds perch on each place ([du, dv, y, turn]).
+   perch(a,b){for(const [du,dv,y,turn] of [a,b]){const [x,z]=at(du,dv);perch[i].push([x,siteY[i]+y+.01,z,A0+turn]);}}};}
+ function canteiro(i){const S=onSite(i),r=SITE[i][2],f=i%2?1:-1,{coral,ivory,ink,wood,plank,sun}=palette;
+  S.geo(hexPad,0,0,-.14,r,.3,r,sand);
+  // Barriers along the front, striped; the gap in the middle is the way in.
+  for(const s of [-1,1]){for(let k=0;k<3;k++)S.box(s*(.2+k*.11),r*.72,.2,.11,.07,.035,k%2?ivory:coral);for(const d of [.15,.42])S.box(s*d,r*.72,.1,.03,.2,.03,ink);}
+  // A half-built wall with a scaffold in front of it, at the back on one side.
+  S.box(-f*.16,-.2,.2,.62,.4,.09,ivory);S.box(-f*.32,-.2,.46,.3,.14,.09,ivory);for(const k of [-.31,.01,.29])S.box(-f*.16+k,-.08,.27,.03,.54,.03,wood);S.box(-f*.16,-.08,.3,.66,.03,.12,plank);
+  // The crane: mast, jib turned over the site, counterweight, cable and hook. Two birds sit on the jib.
+  // In world 7, on the high point, it is lower, so "Ver a trilha toda" keeps it whole (QA M2 of Lote 5.8).
+  const mx=f*.32,my=-.12,ch=i===6?.76:1;S.box(mx,my,ch/2,.07,ch,.07,sun);S.box(mx,my,.04,.24,.08,.24,ink);S.box(mx-f*.2,my,ch-.04,.72,.05,.06,sun);S.box(mx+f*.2,my,ch-.1,.12,.1,.09,ink);S.box(mx-f*.42,my,ch-.24,.012,.36,.012,ink);S.box(mx-f*.42,my,ch-.43,.07,.05,.05,coral);
+  S.perch([mx-f*.1,my,ch-.01,0],[mx-f*.32,my,ch-.01,Math.PI]);
+  // Pile of planks and a traffic cone by the entrance.
+  for(const [k,y] of [[0,.05],[1,.05],[.5,.1]])S.box(-f*.1+k*.13,.2,y,.12,.05,.34,plank);S.geo(coneSite,f*.36,.24,.09,.09,.18,.09,coral);S.box(f*.36,.24,.012,.13,.024,.13,ivory);
+  // The sign of the site: a board on two posts, with a warning square and two lines of "text".
+  const bx=-f*.4,by=.3;for(const d of [-.13,.13])S.box(bx+d,by,.2,.03,.4,.03,wood);S.box(bx,by,.34,.36,.24,.03,ivory);S.box(bx,by+.018,.44,.36,.03,.012,sun);S.box(bx-.1,by+.02,.32,.09,.09,.012,coral);for(const y of [.35,.3])S.box(bx+.06,by+.02,y,.14,.02,.012,ink);
+  return {S,f,bx,by};}
+ for(let i=1;i<7;i++){const {S,f,bx,by}=canteiro(i),{sun,coral,ink}=palette;
+  // World 4: two notes pinned by the top edge of the sign flutter in the wind.
+  if(i===3)for(const [dx,top,h,m] of [[-.09,.45,.1,sun],[.07,.44,.08,coral]]){const y0=.35+top+LIFT;SWAY=(vx,vy)=>Math.max(0,Math.min(1,(y0-vy)/h));S.box(bx+dx,by+.03,top-h/2,.1,h,.012,m);SWAY=0;}
+  // World 5: the post of the pinwheel, in front of the wall.
+  if(i===4){const [x,z]=S.at(-.52,.02);beam(x,.35+.45,z,.03,.9,.03,ink);pinAt=[x+N0[0]*.03,.35+.9+LIFT,z+N0[1]*.03];}
+  // World 6: a tarp over the materials (the cloth ripples, the higher the freer) and two lanterns on posts.
+  if(i===5){const y0=.3+LIFT;SWAY=(vx,vy)=>Math.max(0,Math.min(1,(vy-y0)/.4))*.7;const [x,z]=S.at(f*.02,.16);part(prism,sun,x,.35+.14,z,.7,.5,.7,A0+.4,Math.PI/2);SWAY=0;
+   for(const du of [-.5,.5]){const [x2,z2]=S.at(du,-.05);beam(x2,.35+.25,z2,.03,.5,.03,ink);lanterns.push([x2,.35+.52+LIFT,z2]);}}}
+ // World 1: the miniature of the water park, in its own place beside the first stop. Under works and finished share the pad, the frame of
+ // the pool and the gate; each state is one instanced box mesh (tinted) and the bridge says which one shows (setBuilt). Finished, it also has
+ // the water running (the shader of the river), a flag in the wind and parasols: a few more draw calls, only then.
+ const mini={obras:[],pronta:[],cones:[],water:[],flag:null};
+ {const S=onSite(0),{ivory,coral,sun}=palette,r=SITE[0][2];S.geo(hexPad,0,0,-.14,r,.3,r,palette.high);S.box(-.04,.1,.012,1.08,.03,.72,ivory);
+  for(const [du,dv,sx,sz] of [[-.04,-.17,.86,.06],[-.04,.37,.86,.06],[-.44,.1,.06,.48],[.36,.1,.06,.48]])S.box(du,dv,.05,sx,.05,sz,ivory);
+  // The way in, with its arch, stays in both states: from the trail the place reads as a gate.
+  for(const s of [-1,1])S.box(.48+s*.13,.42,.2,.05,.4,.05,coral);S.box(.48,.42,.42,.36,.08,.06,sun);
+  S.perch([.35,.42,.46,0],[.6,.42,.46,Math.PI]);
+  // The tallest piece of the finished state, so "Ver a trilha toda" keeps it whole.
+  {const [x,z]=S.at(.08,-.38);markBox.mundo1.push(new T.Box3(new T.Vector3(x-.2,.35+LIFT,z-.2),new T.Vector3(x+.2,.35+LIFT+1.1,z+.2)));}
+  const add=(list,du,dv,y,sx,sy,sz,c,tilt=0)=>{const [x,z]=S.at(du,dv);list.push(tilt?[x,.35+y+LIFT,z,sz,sy,sx,0,A0-Math.PI/2,-tilt,c]:[x,.35+y+LIFT,z,sx,sy,sz,0,A0,0,c]);},{coral:CO,sun:SU,ivory:IV,ink:IN,wood:WO,plank:PL,leaf2:LE}=colors;
+  // Under works: sand in the empty pool, the tower as scaffolding, planks, barriers and a small crane.
+  add(mini.obras,-.04,.1,.03,.82,.03,.44,'#d3b27c');for(const [a,b] of [[-.1,-.5],[.2,-.5],[-.1,-.26],[.2,-.26]])add(mini.obras,a,b,.4,.04,.8,.04,WO);for(const y of [.3,.6,.8])add(mini.obras,.05,-.38,y,.38,.03,.3,PL);
+  for(const [a,y] of [[-.22,.09],[-.1,.09],[-.16,.15]])add(mini.obras,a,.1,y,.1,.06,.34,PL);for(const s of [-1,1])for(let k=0;k<3;k++)add(mini.obras,-.3+s*(.1+k*.1),.56,.16,.1,.06,.03,k%2?IV:CO);
+  add(mini.obras,-.58,-.3,.5,.05,1,.05,SU);add(mini.obras,-.36,-.3,.96,.56,.05,.05,SU);add(mini.obras,-.16,-.3,.76,.01,.36,.01,IN);add(mini.obras,-.16,-.3,.57,.06,.05,.05,CO);
+  // Finished: tower and platform in colour, two chutes into the pool, stairs, loungers and people on the deck and in the water.
+  add(mini.pronta,.08,-.38,.4,.2,.8,.2,CO);add(mini.pronta,.08,-.38,.82,.32,.04,.3,IV);add(mini.pronta,.08,-.38,1.02,.36,.03,.34,SU);for(const s of [-1,1])add(mini.pronta,.08+s*.15,-.38,.92,.02,.2,.02,IV);
+  add(mini.pronta,-.08,-.02,.46,.13,.03,.86,SU,.68);add(mini.pronta,.2,-.04,.42,.13,.03,.76,IV,.78);for(let k=0;k<5;k++)add(mini.pronta,.3,-.43+k*.0,.12+k*.14,.12,.03,.1,WO);
+  for(const a of [-.42,-.24])add(mini.pronta,a,.46,.05,.13,.03,.07,CO);add(mini.pronta,.3,.46,.05,.13,.03,.07,SU);
+  for(const [a,b,c,water] of [[-.56,.2,CO,0],[.45,.22,LE,0],[-.3,.05,IN,1],[.05,.28,SU,1]]){if(!water)add(mini.pronta,a,b,.09,.05,.14,.05,c);add(mini.pronta,a,b,water?.09:.2,.06,.06,.06,water?c:'#ffe2c8');}
+  add(mini.water,-.04,.1,.05,.8,.02,.42,'#4f9fd0');
+  for(const [a,b,c] of [[-.56,-.12,CO],[-.56,.42,SU]]){add(mini.pronta,a,b,.17,.02,.34,.02,IV);add(mini.cones,a,b,.38,.34,.12,.34,c);}
+  mini.flag=[...S.at(.08,-.38),siteY[0]+1.02];}
  on(-1);
  // The forest. One tree at most per hexagon, never on the trail, the river banks, a clearing or a landmark; nothing tall
  // between a stop or a guide and the camera (the SVG layer has no occlusion), nor in front of the trail where it would hide it.
@@ -267,26 +306,23 @@ void RE_IndirectDiffuse_Lambert(const in vec3 irradiance,const in vec3 geometryP
  // Mapear: the bench, the mill, flowers in the clearing and along the meadow, and the lake with reeds on its bank.
  const flowers=[],FLOWER=[colors.ivory,colors.sun,'#ffb4a8'];
  for(const tile of tiles){if(tile.land!==0||tile.u>STOP_U[1]+.85*halfU||tile.height<.2||tile.d<1.1||tile.d>3.8||Math.hypot(tile.x-lakeX,tile.z-lakeZ)<1.6||marks.some(([a,b])=>Math.hypot(tile.x-a,tile.z-b)<.9)||clearSpots.some(c=>Math.hypot(tile.x-c.x,tile.z-c.z)<.8))continue;
-  for(let j=0;j<4;j++){const a=hash(tile.q+j,tile.r-j)*6.28,r=.12+.32*hash(tile.r+j,tile.q);if(hash(tile.q*7+j,tile.r)<.5)flowers.push([tile.x+Math.cos(a)*r,tile.height+.05,tile.z+Math.sin(a)*r,1,.7,1,0,a,0,FLOWER[j%3],tile.height]);}}
+  for(let j=0;j<4;j++){const a=hash(tile.q+j,tile.r-j)*6.28,r=.12+.32*hash(tile.r+j,tile.q);const fx=tile.x+Math.cos(a)*r,fz=tile.z+Math.sin(a)*r;if(hash(tile.q*7+j,tile.r)<.5&&nearest(fx,fz).i/600<=STOP_U[1]+.85*halfU)flowers.push([fx,tile.height+.05,fz,1,.7,1,0,a,0,FLOWER[j%3],tile.height]);}}
  for(let i=0;i<7;i++){const a=i/7*Math.PI*2+.4,x=lakeX+Math.cos(a)*.9,z=lakeZ+Math.sin(a)*.9;for(let k=0;k<3;k++)beam(x+k*.06,LAKE_Y+.15+(k%2)*.04,z,.025,.3+(k%2)*.08,.025,palette.high,0,(k-1)*.16);}
  patch(instanced('cenario-lago',capGeo,mat('#ffffff'),lake,true).material,'water');windy(instanced('cenario-flores',new T.OctahedronGeometry(.1,0),mat('#ffffff'),flowers,true),.5,'bloom');
- own('mapear','banco',[landmarks.banco]);own('mapear','moinho',[landmarks.moinho]);own('mapear','flores',xz(flowers),'cenario-flores');own('mapear','lago',xz(lake),'cenario-lago');
+ own('mapear','miniatura do parque',[landmarks.mundo1]);own('mapear','canteiro do mundo 2',[landmarks.mundo2]);own('mapear','moinho',[landmarks.moinho]);own('mapear','flores',xz(flowers),'cenario-flores');own('mapear','lago',xz(lake),'cenario-lago');
  // Analisar: the bridge, the notice board and stones in the river on both sides of the bridge.
- const pebbles=[];for(let i=0;i<30;i++){const d=-3.4+i*.24,side=(hash(i,3)-.5)*.7;if(Math.abs(d)<1.3||hash(3,i)<.3)continue;pebbles.push([stops[2].x+RV[0]*d+RN[0]*side,.15,stops[2].z+RV[1]*d+RN[1]*side,.5+.4*hash(i,5),.3,.45+.4*hash(5,i),0,i,0,hash(i,i)<.5?colors.rock:'#c8c2a4']);}
+ const pebbles=[];for(let i=0;i<30;i++){const d=-3.4+i*.24,side=(hash(i,3)-.5)*.7;if(Math.abs(d)<1.3||hash(3,i)<.3)continue;pebbles.push([BR.x+RV[0]*d+RN[0]*side,.15,BR.z+RV[1]*d+RN[1]*side,.5+.4*hash(i,5),.3,.45+.4*hash(5,i),0,i,0,hash(i,i)<.5?colors.rock:'#c8c2a4']);}
  instanced('cenario-seixos',rockGeo,mat('#ffffff',{vertexColors:true}),pebbles,true);
- own('analisar','ponte',[landmarks.ponte]);own('analisar','quadro de avisos',[landmarks.placa]);own('analisar','pedras do rio',xz(pebbles),'cenario-seixos');
- // Priorizar: the post with three arrows, a sign at the end of each short path and the yellow field in front of the fork.
- const stalks=[],signs=[];for(const tile of field)for(let j=0;j<9;j++){const a=hash(tile.q+j*3,tile.r)*6.28,r=.08+.4*hash(tile.r,tile.q+j);stalks.push([tile.x+Math.cos(a)*r,tile.height+.14,tile.z+Math.sin(a)*r,1,.8+.5*hash(j,tile.q),1,0,a,0,j%3?colors.sun:'#e8a93a',tile.height]);}
- {const s=stops[4],base=Math.atan2(-curve.getTangentAt(s.u).z,curve.getTangentAt(s.u).x);for(const [ry,c] of [[.7,colors.coral],[-.5,colors.sun]]){const x=s.x+Math.cos(base+ry)*1.3,z=s.z-Math.sin(base+ry)*1.3;signs.push([x,s.y+.25,z,.05,.5,.05,0,0,0,colors.wood],[x,s.y+.45,z,.34,.13,.035,0,base+ry,0,c]);perch[4].push([x,s.y+.53,z,base+ry]);}}
- windy(instanced('cenario-campo',new T.ConeGeometry(.06,.3,4,1,true),mat('#ffffff'),stalks,true),.25);instanced('cenario-placas',box,mat('#ffffff'),signs,true);
- own('priorizar','encruzilhada',[landmarks.bifurcacao]);own('priorizar','placas',xz(signs.filter((_,i)=>i%2)),'cenario-placas');own('priorizar','campo amarelo',field.map(t=>[t.x,t.z]),'cenario-campo');
- // Agir: the camp, the flames of its campfire, the hills down in front of the climb and the lookout on the high point.
- const [cx0,cz0]=landmarks.acampamento,cy0=stops[5].y,fire=[[cx0-.1,cy0+.17,cz0+.5,1,1,1,0,0,0,colors.coral],[cx0-.05,cy0+.14,cz0+.45,.7,.75,.7,0,1,0,colors.sun],[cx0-.15,cy0+.13,cz0+.55,.6,.65,.6,0,2,0,'#ff8a3d']];
- const flames=instanced('cenario-fogueira',new T.ConeGeometry(.07,.2,5),mat('#ffffff'),fire,true);patch(flames.material,'glow');
- own('agir','acampamento',[landmarks.acampamento]);own('agir','fogueira',xz(fire),'cenario-fogueira');own('agir','mirante',[landmarks.mirante]);own('agir','colinas',tiles.filter(t=>t.u>STOP_U[4]+halfU+.01&&t.front&&t.d>=1.9&&t.d<5&&t.height>.44).map(t=>[t.x,t.z]));
+ own('analisar','ponte',[landmarks.ponte]);own('analisar','canteiros',[landmarks.mundo3,landmarks.mundo4]);own('analisar','pedras do rio',xz(pebbles),'cenario-seixos');
+ // Priorizar: the site of world 5, with the pinwheel, and the yellow field in front of it.
+ const stalks=[];for(const tile of field)for(let j=0;j<9;j++){const a=hash(tile.q+j*3,tile.r)*6.28,r=.08+.4*hash(tile.r,tile.q+j);stalks.push([tile.x+Math.cos(a)*r,tile.height+.14,tile.z+Math.sin(a)*r,1,.8+.5*hash(j,tile.q),1,0,a,0,j%3?colors.sun:'#e8a93a',tile.height]);}
+ windy(instanced('cenario-campo',new T.ConeGeometry(.06,.3,4,1,true),mat('#ffffff'),stalks,true),.25);
+ own('priorizar','canteiro do mundo 5',[landmarks.mundo5]);own('priorizar','cata-vento',[[pinAt[0],pinAt[2]]]);own('priorizar','campo amarelo',field.map(t=>[t.x,t.z]),'cenario-campo');
+ // Agir: the sites of the worlds 6 and 7, with the lanterns, and the hills down in front of the climb.
+ own('agir','canteiro do mundo 6',[landmarks.mundo6]);own('agir','canteiro do mundo 7',[landmarks.mundo7]);own('agir','lanternas',lanterns.map(([x,,z])=>[x,z]));own('agir','colinas',tiles.filter(t=>t.u>STOP_U[4]+halfU+.01&&t.front&&t.d>=1.9&&t.d<5&&t.height>.44).map(t=>[t.x,t.z]));
  // Reeds stand in the shallow water by both banks, away from the bridge; a few sway.
- for(let i=0;i<40;i++){const d=-8+i*.4,side=i%2?-.72:.66,x=stops[2].x+RV[0]*d+RN[0]*side,z=stops[2].z+RV[1]*d+RN[1]*side;if(Math.abs(d)<1.4)continue;for(let k=0;k<3;k++)beam(x+k*.06,.28+(k%2)*.04,z,.025,.3+(k%2)*.08,.025,palette.high,0,(k-1)*.16);}
- const stream=new T.Group();stream.name='corrente';const streamBase=new T.Group();streamBase.position.set(stops[2].x,0,stops[2].z);streamBase.rotation.y=Math.atan2(RV[0],RV[1]);streamBase.add(stream);scene.add(streamBase);
+ for(let i=0;i<40;i++){const d=-8+i*.4,side=i%2?-.72:.66,x=BR.x+RV[0]*d+RN[0]*side,z=BR.z+RV[1]*d+RN[1]*side;if(Math.abs(d)<1.4)continue;for(let k=0;k<3;k++)beam(x+k*.06,.28+(k%2)*.04,z,.025,.3+(k%2)*.08,.025,palette.high,0,(k-1)*.16);}
+ const stream=new T.Group();stream.name='corrente';const streamBase=new T.Group();streamBase.position.set(BR.x,0,BR.z);streamBase.rotation.y=Math.atan2(RV[0],RV[1]);streamBase.add(stream);scene.add(streamBase);
  const currents=new T.InstancedMesh(box,palette.ivory,20);for(let i=0;i<20;i++){dummy.position.set((i%3-1)*.16,.163,-8+i*.82);dummy.scale.set(.09,.009,.18);dummy.rotation.set(0,0,0);dummy.updateMatrix();currents.setMatrixAt(i,dummy.matrix);}stream.add(currents);
  // Static parts become one mesh per material (Lote 5.4: draw calls); the reeds keep their instances to sway.
  // Lote 5.9: each merged mesh keeps a cloth weight per vertex (aSway, from SWAY) on its own copy of the material, so the
@@ -302,6 +338,8 @@ void RE_IndirectDiffuse_Lambert(const in vec3 irradiance,const in vec3 geometryP
   for(const [a,f,g0] of arrays){all.set(a,o);let lo=1e9;for(let k=1;k<a.length;k+=3)lo=Math.min(lo,a[k]);const base=Math.max(lo,g0??-1e9);
    for(let k=0;k<a.length;k+=3){shade.fill(.62+.38*T.MathUtils.smoothstep(a[k+1],base,base+.32),o+k,o+k+3);if(f)sway[(o+k)/3]=f(a[k],a[k+1],a[k+2]);}o+=a.length;}
   const g=new T.BufferGeometry(),mm=patch(m.clone(),'sway',.05);mm.vertexColors=true;g.setAttribute('position',new T.BufferAttribute(all,3));g.setAttribute('aSway',new T.BufferAttribute(sway,1));g.setAttribute('color',new T.BufferAttribute(shade,3));g.computeVertexNormals();scene.add(new T.Mesh(g,mm));}
+ // Lote 6.2: the two states of the miniature, its water and its parasols, and the flag on the tower (below, with the flags of the stops).
+ const miniMesh={obras:instanced('mini-obras',box,mat('#ffffff'),mini.obras,true),pronta:instanced('mini-pronta',box,mat('#ffffff'),mini.pronta,true),cones:instanced('mini-guarda-sois',coneSite,mat('#ffffff'),mini.cones,true),water:instanced('mini-agua',box,patch(new T.MeshLambertMaterial({color:'#ffffff',flatShading:true}),'water'),mini.water,true)};
  // Bino and Téo stand on the ground of their hexagon; Pipa flies a little above the water.
  for(const [n,g] of Object.entries(guides)){const t=tiles.reduce((a,b)=>Math.hypot(b.x-g.x,b.z-g.z)<Math.hypot(a.x-g.x,a.z-g.z)?b:a);g.y=n==='pipa'?Math.max(stops[2].y+PIPA_Y,t.height):t.height;}
  // Stop markers: plaza, zone ring, pole, flag, lantern and a badge whose glyph names the state.
@@ -309,6 +347,7 @@ void RE_IndirectDiffuse_Lambert(const in vec3 irradiance,const in vec3 geometryP
  // Each stop keeps plain Object3D handles (ring, flag, lamp, badge...) that the code and the tests move as before.
  const plazaGeo=new T.CylinderGeometry(.38,.38,.03,8),ringGeo=new T.TorusGeometry(.38,.045,5,24),poleGeo=new T.CylinderGeometry(.025,.025,.85,5),flagGeo=new T.PlaneGeometry(.3,.19,8,1),lampGeo=new T.SphereGeometry(.08,8,6),lampMat=mat(colors.sun,{emissive:colors.sun,emissiveIntensity:.9});
  const PARTS={plaza:[plazaGeo,palette.path],ring:[ringGeo,mat('#ffffff')],pole:[poleGeo,palette.wood],flag:[flagGeo,patch(new T.MeshLambertMaterial({color:'#ffffff',flatShading:true,side:T.DoubleSide}),'flag')],lamp:[lampGeo,lampMat]};
+ const miniFlag=new T.InstancedMesh(flagGeo,PARTS.flag[1],1);miniFlag.name='mini-bandeira';miniFlag.frustumCulled=false;miniFlag.setMatrixAt(0,matrixOf([mini.flag[0]+R0[0]*.16,mini.flag[2],mini.flag[1]+R0[1]*.16,.9,.9,.9,0,A0,0]));miniFlag.setColorAt(0,new T.Color(colors.leaf2));scene.add(miniFlag);
  const tint=new T.Color('#ffffff'),markers=Object.fromEntries(Object.entries(PARTS).map(([k,[g,m]])=>{const mesh=new T.InstancedMesh(g,m,stops.length+(k==='lamp'?lanterns.length:0));mesh.name='paradas-'+k;mesh.frustumCulled=false;if(k==='ring'||k==='flag')stops.forEach((_,i)=>mesh.setColorAt(i,tint));scene.add(mesh);return [k,mesh];}));
  const atlas=document.createElement('canvas');atlas.width=128*stops.length;atlas.height=128;const atlasTexture=new T.CanvasTexture(atlas);atlasTexture.colorSpace=T.SRGBColorSpace;
  const badgeGeo=new T.BufferGeometry(),badgePos=new Float32Array(stops.length*12),uv=[],quads=[];
@@ -325,27 +364,28 @@ void RE_IndirectDiffuse_Lambert(const in vec3 irradiance,const in vec3 geometryP
   stop.markers=[stop.badge,stop.pole,stop.flag,stop.lamp];
   const hit=new T.Mesh(new T.CylinderGeometry(.5,.5,1.4,8),new T.MeshBasicMaterial({visible:false}));hit.userData.stop=stop.index;hit.position.set(stop.x,stop.y+.55,stop.z);scene.add(hit);targets.push(hit);
  }
+ // Lote 6.2: a tap on the place of a world also picks its stop. They come after the seven targets of the stops, which keep their index.
+ for(const stop of stops){const place=targets[stop.index].clone(),k=SITE[stop.index][2]/.5;place.scale.set(k,1,k);place.position.set(siteAt[stop.index].x,siteY[stop.index]+.55,siteAt[stop.index].z);scene.add(place);targets.push(place);}
  // Lote 5.9 (adendo): soft blob shadows ground the trees, bushes and landmarks on the hexagons (three.js manual, "Shadows": a
  // plane with a radial texture, no depth write), and a false glow lights the lanterns, the saved stops and the campfire (additive
  // quads turned to the camera in the vertex shader). One InstancedMesh each; the textures are drawn on a canvas, 0 bytes.
- const radial=()=>{const c=document.createElement('canvas');c.width=c.height=64;const g=c.getContext('2d'),r=g.createRadialGradient(32,32,0,32,32,32);r.addColorStop(0,'#fff');r.addColorStop(.45,'rgba(255,255,255,.6)');r.addColorStop(1,'rgba(255,255,255,0)');g.fillStyle=r;g.fillRect(0,0,64,64);return new T.CanvasTexture(c);};
  const blobItems=[...trunks.map(t=>[t[0],t[10]+.014,t[2],1.15*t[4]/.8,1,t[4]/.8]),...bushes.map(b=>[b[0],b[10]+.014,b[2],.6*b[3],1,.6*b[5]]),
-  ...[[landmarks.moinho,1,1.7],[landmarks.mirante,6,1.5],[landmarks.acampamento,5,1.1],[landmarks.banco,0,.9],[landmarks.placa,3,.7],[landmarks.bifurcacao,4,.55]].map(([[x,z],i,r])=>[x,stops[i].y+.014,z,r,1,r*.85])];
+  [landmarks.moinho[0],stops[1].y+.014,landmarks.moinho[1],1.7,1,1.45]];
  const blobs=new T.InstancedMesh(new T.PlaneGeometry(1,1).rotateX(-Math.PI/2),new T.MeshBasicMaterial({map:radial(),color:'#14301f',transparent:true,opacity:.34,depthWrite:false,polygonOffset:true,polygonOffsetFactor:-2,polygonOffsetUnits:-2,toneMapped:false}),blobItems.length);
  blobs.name='sombras';blobItems.forEach((it,i)=>blobs.setMatrixAt(i,matrixOf([...it.slice(0,3),it[3],1,it[5],0,0,0])));blobs.userData.items=blobItems;scene.add(blobs);
  const glowMat=new T.MeshBasicMaterial({map:radial(),color:'#ffc83d',transparent:true,opacity:.32,blending:T.AdditiveBlending,depthWrite:false,toneMapped:false});
  glowMat.onBeforeCompile=s=>{s.vertexShader=s.vertexShader.replace('#include <project_vertex>','vec4 mvPosition=modelViewMatrix*instanceMatrix*vec4(0.,0.,0.,1.);mvPosition.xy+=position.xy*length(instanceMatrix[0].xyz);gl_Position=projectionMatrix*mvPosition;');};glowMat.customProgramCacheKey=()=>'brilho';
- // Glows: [0,2) camp lanterns, 2 the campfire, [3,10) the lamp of each stop (shown when its lamp is lit, see syncStops).
- const glow=new T.InstancedMesh(new T.PlaneGeometry(1,1),glowMat,3+stops.length),fireAt=[cx0-.1,cy0+.28,cz0+.5];glow.name='brilhos';glow.frustumCulled=false;scene.add(glow);
- lanterns.forEach((p,i)=>glow.setMatrixAt(i,matrixOf([...p,.34,.34,.34,0,0,0])));stops.forEach((_,i)=>glow.setMatrixAt(3+i,hidden));
+ // Glows: [0,2) lanterns of world 6, [2,9) the lamp of each stop (shown when its lamp is lit, see syncStops).
+ const glow=new T.InstancedMesh(new T.PlaneGeometry(1,1),glowMat,2+stops.length);glow.name='brilhos';glow.frustumCulled=false;scene.add(glow);
+ lanterns.forEach((p,i)=>glow.setMatrixAt(i,matrixOf([...p,.34,.34,.34,0,0,0])));stops.forEach((_,i)=>glow.setMatrixAt(2+i,hidden));
  // Lote 5.9: living things. Critters share one winged shape (body along +x, wings along ±z; the shader flaps the tips):
  // butterflies over the flowers of Mapear, ducks on the lake, a fish that jumps in the river now and then, a flock that crosses
  // the sky and two birds perched on the landmark of each stop, which fly off and come back when a phase passage brings Rumo
- // there. Particles share one low ball: smoke of the chimney and of the campfire, sparks, leaves and foam down the river, and
- // the clouds. Only these and the flames are written on the CPU (state().metrics.maxLife counts the instances of a frame, 60 at
+ // there. Particles share one low ball: smoke of the chimney, leaves and foam down the river, and
+ // the clouds. Only these are written on the CPU (state().metrics.maxLife counts the instances of a frame, 60 at
  // most); wind, water, cloth, flags and wings move in the shaders.
  // Critters: [0,5) butterflies, [5,8) ducks, 8 the fish, [9,16) the flock, [16,30) perched birds, two per stop in stop order.
- // Particles: [0,5) chimney smoke, [5,10) campfire smoke, [10,15) sparks, [15,21) leaves, [21,24) foam; clouds: three of two puffs.
+ // Particles: [0,5) chimney smoke, [5,11) leaves, [11,14) foam; clouds: three of two puffs. Lote 6.2: the campfire left with the camp.
  lanterns.forEach((p,i)=>{dummy.position.set(...p);dummy.scale.set(1,1,1);dummy.rotation.set(0,0,0);dummy.updateMatrix();markers.lamp.setMatrixAt(stops.length+i,dummy.matrix);});
  const wingGeo=new T.BufferGeometry();{const N=[.5,0,0],B=[-.5,0,0],P=[0,.14,0],D=[0,-.1,0],L=[0,0,.12],R=[0,0,-.12],v=[N,P,L,N,R,P,N,L,D,N,D,R,B,L,P,B,P,R,B,D,L,B,R,D],w=v.map(()=>0);
   for(const s of [1,-1]){v.push([.18,.04,.06*s],[-.22,.04,.06*s],[-.04,.06,.62*s]);w.push(0,0,1);}
@@ -353,67 +393,61 @@ void RE_IndirectDiffuse_Lambert(const in vec3 irradiance,const in vec3 geometryP
  const lifeMat=(mode,extra={})=>patch(new T.MeshLambertMaterial({color:'#ffffff',flatShading:true,...extra}),mode),PERCHED=16,perches=perch.flat();
  const critters=new T.InstancedMesh(wingGeo,lifeMat('critter',{side:T.DoubleSide}),PERCHED+perches.length),flap=new Float32Array(critters.count*3);
  critters.name='bichos';critters.frustumCulled=false;wingGeo.setAttribute('aFly',new T.InstancedBufferAttribute(flap,3));scene.add(critters);
- const puffGeo=new T.IcosahedronGeometry(.5,0),puffs=new T.InstancedMesh(puffGeo,lifeMat('particle'),24),glows=new Float32Array(24);
+ const puffGeo=new T.IcosahedronGeometry(.5,0),puffs=new T.InstancedMesh(puffGeo,lifeMat('particle'),14),glows=new Float32Array(14);
  puffs.name='particulas';puffs.frustumCulled=false;puffGeo.setAttribute('aGlow',new T.InstancedBufferAttribute(glows,1));scene.add(puffs);
  const clouds=new T.InstancedMesh(puffGeo,lifeMat('cloud',{color:'#f7f9fb',transparent:true,opacity:.62,depthWrite:false}),6);clouds.name='nuvens';clouds.frustumCulled=false;scene.add(clouds);
  for(let i=0;i<critters.count;i++){critters.setColorAt(i,new T.Color(i<5?[colors.sun,'#ffb4a8',colors.ivory,'#ffb4a8',colors.sun][i]:i<8?(i<7?colors.ivory:'#e9dfc3'):i===8?'#a9c2d6':i<PERCHED||i%2?colors.ink:'#4a5a7d'));
   flap.set(i<5?[1,i*1.3,12]:i>8&&i<PERCHED?[1,i*.8,9]:[0,i*.9,10],i*3);}
- for(let i=0;i<24;i++){puffs.setColorAt(i,new T.Color(i<5?'#f4f1ea':i<10?'#d8d2c8':i<15?(i%2?colors.sun:'#ff8a3d'):i<21?[colors.leaf2,colors.sun,'#d98a2b'][i%3]:colors.ivory));glows[i]=i>=10&&i<15?1:0;}
- // The pinwheel on the post of the fork: four blades facing the camera, turning with the wind and faster in a gust.
+ for(let i=0;i<14;i++)puffs.setColorAt(i,new T.Color(i<5?'#f4f1ea':i<11?[colors.leaf2,colors.sun,'#d98a2b'][i%3]:colors.ivory));
+ // The pinwheel on the post of world 5: four blades facing the camera, turning with the wind and faster in a gust.
  const pinwheel=new T.Group(),blades=new T.Mesh(new T.BufferGeometry(),mat('#ffffff',{vertexColors:true,side:T.DoubleSide}));pinwheel.position.set(...pinAt);pinwheel.rotation.y=A0;blades.name='cata-vento';pinwheel.add(blades);scene.add(pinwheel);
  {const v=[],c=[];[colors.coral,colors.sun,colors.leaf2,colors.ivory].forEach((col,k)=>{const a=k*Math.PI/2,cc=new T.Color(col);v.push(0,0,0,Math.cos(a)*.17,Math.sin(a)*.17,0,Math.cos(a+1.2)*.09,Math.sin(a+1.2)*.09,.03);for(let j=0;j<3;j++)c.push(cc.r,cc.g,cc.b);});
   blades.geometry.setAttribute('position',new T.Float32BufferAttribute(v,3));blades.geometry.setAttribute('color',new T.Float32BufferAttribute(c,3));}
  const bfAt=[0,1,2,3,4].map(i=>flowers.length?flowers[Math.floor((i+.5)/5*flowers.length)]:[stops[0].x,stops[0].y,stops[0].z]),birdAge=perches.map(()=>null);
- let lifeT=0,sparkT=0,live=0,calm=false,calmNow=1,wheelSpeed=0,pinAngle=0,gustAge=9,fireAge=9,bloomAge=9,flock=-1,nextFlock=4,fishOn=false,fishAge=null,fishN=0,nextFish=5,lifeCount=0,flapDirty=false;
+ let lifeT=0,live=0,calm=false,calmNow=1,wheelSpeed=0,pinAngle=0,gustAge=9,bloomAge=9,flock=-1,nextFlock=4,fishOn=false,fishAge=null,fishN=0,nextFish=5,lifeCount=0,flapDirty=false;
  const body=new T.Object3D();body.rotation.order='YZX';// roll first (the fish turns its wings into fins), then pitch, then heading
  const put=(mesh,i,x,y,z,sx,sy,sz,ry=0,rz=0,rx=0)=>{body.position.set(x,y,z);body.scale.set(sx,sy,sz);body.rotation.set(rx,ry,rz);body.updateMatrix();mesh.setMatrixAt(i,body.matrix);lifeCount++;};
  const frac=v=>v-Math.floor(v),face=(dx,dz)=>Math.atan2(-dz,dx),hide=(mesh,i)=>put(mesh,i,0,-9,0,0,0,0);
- const boost=()=>fireAge<3.5?Math.min(1,fireAge/.25)*Math.exp(-Math.max(0,fireAge-.25)*1.1):0;
  function perchBird(i){const [x,y,z,ry]=perches[i];put(critters,PERCHED+i,x,y,z,.17,.17,.07,ry);flap[(PERCHED+i)*3]=0;flapDirty=true;}
  // A bird of a stop flies a short loop over 2.6 s, sideways and a little up, and lands where it was. QA A3: the loop of 4.6 s up
  // and away from the camera left the frame of a short map; this one stays beside the stop.
  const FLIGHT=2.6,loop=(i,q)=>{const [px,py,pz]=perches[i],o=Math.sin(Math.PI*q),w=Math.sin(2*Math.PI*q)*(i%2?.9:-.9);return [px+N0[0]*.35*o+R0[0]*w,py+.6*o,pz+N0[1]*.35*o+R0[1]*w];};
- function updateLife(){lifeCount=0;const t=lifeT,b=boost();
+ function updateLife(){lifeCount=0;const t=lifeT;
   for(let i=0;i<5;i++){const [ax,ay,az]=bfAt[i],p=t+i*7.3;put(critters,i,ax+.38*Math.sin(p*.7+i)+.12*Math.sin(p*1.9+i*2),ay+.3+.1*Math.sin(p*1.3+i),az+.3*Math.cos(p*.53+i*1.7),.07,.1,.22,face(.27*Math.cos(p*.7+i)+.23*Math.cos(p*1.9+i*2),-.16*Math.sin(p*.53+i*1.7)));}
   for(let i=0;i<3;i++){const a=t*.2+i*2.1,r=.35+.15*i;put(critters,5+i,lakeX+Math.cos(a)*r,LAKE_Y+.04+.012*Math.sin(t*1.7+i),lakeZ+Math.sin(a)*r,.22,.26,.1,face(-Math.sin(a),Math.cos(a)));}
   // The fish jumps across the river now and then, at two places away from the bridge; between jumps it is hidden. QA A5: a jump
   // runs 0.9 s in real time and starts only before the ambient slows down, so it never stops in the air.
-  {if(fishAge!==null&&fishAge>=.9){hide(critters,8);fishAge=null;fishOn=false;}if(fishAge!==null){const k=fishAge/.9,d=fishN%2?-2.6:3.1,c=-.3+.6*k;put(critters,8,stops[2].x+RV[0]*d+RN[0]*c,.12+.5*Math.sin(Math.PI*k),stops[2].z+RV[1]*d+RN[1]*c,.2,.16,.12,face(RN[0],RN[1]),Math.atan2(Math.PI*Math.cos(Math.PI*k),.6),Math.PI/2);fishOn=true;}}
+  {if(fishAge!==null&&fishAge>=.9){hide(critters,8);fishAge=null;fishOn=false;}if(fishAge!==null){const k=fishAge/.9,d=fishN%2?-2.6:3.1,c=-.3+.6*k;put(critters,8,BR.x+RV[0]*d+RN[0]*c,.12+.5*Math.sin(Math.PI*k),BR.z+RV[1]*d+RN[1]*c,.2,.16,.12,face(RN[0],RN[1]),Math.atan2(Math.PI*Math.cos(Math.PI*k),.6),Math.PI/2);fishOn=true;}}
   // The flock: seven birds in a V crossing the sky from left to right over 8 s, above the trail and a little behind it, in real time
   // (QA A5: in the calm it took 32 s and stopped in the sky).
   if(flock>=0){const q=flock/8;if(q>=1){for(let j=0;j<7;j++)hide(critters,9+j);flock=-1;}
    else for(let j=0;j<7;j++){const r=Math.ceil(j/2),s=-26+52*q-r*.45,[x,z]=W(s,s*AX[1]/AX[0]-1.4+(j%2?1:-1)*r*.42);put(critters,9+j,x,4.3+.15*Math.sin(q*9+j),z,.22,.2,.22,A0);}}
   birdAge.forEach((a,i)=>{if(a===null||a<0)return;const q=a/FLIGHT;if(q>=1){birdAge[i]=null;perchBird(i);return;}const p=loop(i,q),p2=loop(i,Math.min(1,q+.02));
    put(critters,PERCHED+i,p[0],p[1],p[2],.17,.17,.17,q>.97?perches[i][3]:face(p2[0]-p[0],p2[2]-p[2]));const on=q<.9?1:0;if(flap[(PERCHED+i)*3]!==on){flap[(PERCHED+i)*3]=on;flapDirty=true;}});
-  // Smoke grows and shrinks (no fade, no pop), leaning with the wind; the campfire flares in a passage to Agir.
+  // Smoke grows and shrinks (no fade, no pop), leaning with the wind.
   for(let i=0;i<5;i++){const a=frac(t*.3+i/5),s=.2*Math.pow(Math.sin(Math.PI*a),.8)*(.6+a);put(puffs,i,chimney[0]+.85*a*.5+.05*Math.sin(a*7+i),chimney[1]+a*1.1,chimney[2]-.52*a*.5,s,s,s,i);}
-  for(let i=0;i<5;i++){const a=frac(t*.36+i/5+.1),s=.15*(1+.6*b)*Math.pow(Math.sin(Math.PI*a),.8)*(.6+a);put(puffs,5+i,fireAt[0]+.85*a*.35+.04*Math.sin(a*6+i),fireAt[1]+.1+a*(.9+.4*b),fireAt[2]-.52*a*.35,s,s,s,i);}
-  for(let i=0;i<5;i++){const a=frac(sparkT+i*.37),s=.045*(1+.5*b)*Math.sin(Math.PI*a);put(puffs,10+i,fireAt[0]+.14*Math.sin(i*2.3+a*5),fireAt[1]+a*(.75+.6*b),fireAt[2]+.14*Math.cos(i*1.7+a*4),s,s,s,a*6);}
-  for(let i=0;i<9;i++){const d=-7+frac(t*.05+i*.137)*14,side=(hash(i,9)-.5)*.75,f=Math.min(1,(7-Math.abs(d))/1.5),leaf=i<6;put(puffs,15+i,stops[2].x+RV[0]*d+RN[0]*side,.145,stops[2].z+RV[1]*d+RN[1]*side,(leaf?.13:.16)*f,(leaf?.03:.012)*f,(leaf?.08:.12)*f,t*.6+i);}
+  for(let i=0;i<9;i++){const d=-7+frac(t*.05+i*.137)*14,side=(hash(i,9)-.5)*.75,f=Math.min(1,(7-Math.abs(d))/1.5),leaf=i<6;put(puffs,5+i,BR.x+RV[0]*d+RN[0]*side,.145,BR.z+RV[1]*d+RN[1]*side,(leaf?.13:.16)*f,(leaf?.03:.012)*f,(leaf?.08:.12)*f,t*.6+i);}
   // Clouds drift left to right just behind the trail, 6.7 above it: on screen they pass over the far forest, behind the landmarks
   // and the guides (QA A1, A2: 2.6 above, they crossed the mill, Pipa and Bino; 5.4 above, the head of Bino), and their shadows (shader) fall straight under
   // them, over the edge of the trail.
   for(let c=0;c<3;c++){const s=frac((c*16+t*.18)/48)*48-24,[x,z]=W(s,s*AX[1]/AX[0]+[-1,-.4,-1.4][c]),y=7+.2*c+rise(Math.max(0,Math.min(6,s/DX+3))),k=.8+.15*c;
    put(clouds,c*2,x,y,z,2*k,.9*k,1.4*k,c);put(clouds,c*2+1,x+R0[0]*.85*k,y-.15,z+R0[1]*.85*k,1.2*k,.6*k,k,c+1);U.uCloud.value[c].set(x,z,1.25*k);}
-  put(glow,2,fireAt[0],fireAt[1]-.05,fireAt[2],.62*(1+.07*Math.sin(t*5)+.5*b),1,1);glow.instanceMatrix.needsUpdate=true;
-  for(let j=0;j<3;j++){const it=fire[j],s=1+.16*Math.sin(t*7+j*2.1)+.6*b;put(flames,j,it[0],it[1]+.1*it[4]*(s-1),it[2],it[3]*(1+.3*b),it[4]*s,it[5]*(1+.3*b),it[7]);}
-  critters.instanceMatrix.needsUpdate=true;puffs.instanceMatrix.needsUpdate=true;clouds.instanceMatrix.needsUpdate=true;flames.instanceMatrix.needsUpdate=true;if(flapDirty){critters.geometry.attributes.aFly.needsUpdate=true;flapDirty=false;}
+  critters.instanceMatrix.needsUpdate=true;puffs.instanceMatrix.needsUpdate=true;clouds.instanceMatrix.needsUpdate=true;if(flapDirty){critters.geometry.attributes.aFly.needsUpdate=true;flapDirty=false;}
   return lifeCount;}
  // One step of the ambient (adt: real seconds while it runs). live eases to 0 in its last 2 s, so everything slows to a stop
  // instead of freezing, and back to 1 at the next touch; the calm (a text field in focus) eases the wind to 15% and the
  // critters to a quarter of their pace. The mill wheel speeds up and slows down the same way.
  function lifeStep(adt){const k=1-Math.exp(-adt/.45);live+=((ambient<10?1:0)-live)*k;calmNow+=((calm?.15:1)-calmNow)*k;
-  const pace=live*(.25+.75*(calmNow-.15)/.85);lifeT+=adt*pace;sparkT+=adt*pace*(.95+.5*boost());U.uT.value=lifeT;U.uAmp.value=live*calmNow;
-  gustAge+=adt;fireAge+=adt;bloomAge+=adt;U.uGust.value.z=gustAge<4?1.6*Math.exp(-gustAge*1.3):0;U.uGust.value.w=gustAge;U.uBloom.value.z=bloomAge<3.5?1:0;U.uBloom.value.w=bloomAge;
+  const pace=live*(.25+.75*(calmNow-.15)/.85);lifeT+=adt*pace;U.uT.value=lifeT;U.uAmp.value=live*calmNow;
+  gustAge+=adt;bloomAge+=adt;U.uGust.value.z=gustAge<4?1.6*Math.exp(-gustAge*1.3):0;U.uGust.value.w=gustAge;U.uBloom.value.z=bloomAge<3.5?1:0;U.uBloom.value.w=bloomAge;
   birdAge.forEach((a,i)=>{if(a!==null)birdAge[i]=a+adt;});if(flock>=0)flock+=adt;else if(ambient<2&&!calm&&lifeT>=nextFlock){flock=0;nextFlock=lifeT+26;}
   if(fishAge!==null)fishAge+=adt;else if(ambient<9&&lifeT>=nextFish){fishAge=0;fishN++;nextFish=lifeT+6;}
   wheelSpeed+=((ambient<9?.7:0)-wheelSpeed)*(1-Math.exp(-adt/.8));wheel.rotation.x+=wheelSpeed*adt;stream.position.z=(lifeT*.18)%.82;
   const g=U.uGust.value;pinAngle+=adt*(U.uAmp.value*1.6+4*g.z*Math.exp(-((pinAt[0]-g.x)**2+(pinAt[2]-g.y)**2)/4));blades.rotation.z=pinAngle;
   metrics.maxLife=Math.max(metrics.maxLife,updateLife());}
- // A phase passage wakes the place where Rumo arrives: the birds of the new stop fly off and come back, the campfire flares in
- // Agir, and leaving the Clareira the flowers of Mapear open in a wave from it. It all starts as Rumo sets off, while the camera still
+ // A phase passage wakes the place where Rumo arrives: the birds of the new stop fly off and come back, and leaving the Clareira the flowers of Mapear open in a wave from it. It all starts as Rumo sets off, while the camera still
  // holds the stop he leaves (QA A3: at half the walk it had left). A tap on a stop sends a gust there.
- function wake(to,from){if(!motion||!running())return;birdAge[to*2]=0;birdAge[to*2+1]=-.15;if(to>=5)fireAge=0;if(from===0){bloomAge=0;U.uBloom.value.set(stops[from].x,stops[from].z,1,0);}}
+ function wake(to,from){if(!motion||!running())return;birdAge[to*2]=0;birdAge[to*2+1]=-.15;if(from===0){bloomAge=0;U.uBloom.value.set(stops[from].x,stops[from].z,1,0);}}
  function gust(i){const s=stops[i];if(!s||!motion||!running())return;gustAge=0;U.uGust.value.set(s.x,s.z,1.6,0);ambient=0;schedule();}
  // Lote 5.11: when a phase ends, one burst of confetti over Rumo at the new stop: 80 flat pieces in the colors of the kit for 1 s,
  // thrown up and falling with drag, no loop, created and disposed in each passage (one draw call while it lasts). Unlit, with the
@@ -432,7 +466,7 @@ void RE_IndirectDiffuse_Lambert(const in vec3 irradiance,const in vec3 geometryP
   b.mesh.instanceMatrix.needsUpdate=true;metrics.maxConfetti=Math.max(metrics.maxConfetti,b.p.length);}
  function endBurst(){if(!burst)return;scene.remove(burst.mesh);burst.mesh.dispose();burst=null;}
  // Pause, reduced motion or leaving the view: birds back on their perch, the fish and the flock away, no gust, flare or bloom.
- function settleLife(){birdAge.forEach((a,i)=>{if(a!==null){birdAge[i]=null;perchBird(i);}});gustAge=fireAge=bloomAge=9;U.uGust.value.z=0;U.uBloom.value.z=0;flock=-1;fishAge=null;updateLife();hide(critters,8);fishOn=false;for(let j=0;j<7;j++)hide(critters,9+j);critters.instanceMatrix.needsUpdate=true;}
+ function settleLife(){birdAge.forEach((a,i)=>{if(a!==null){birdAge[i]=null;perchBird(i);}});gustAge=bloomAge=9;U.uGust.value.z=0;U.uBloom.value.z=0;flock=-1;fishAge=null;updateLife();hide(critters,8);fishOn=false;for(let j=0;j<7;j++)hide(critters,9+j);critters.instanceMatrix.needsUpdate=true;}
  perches.forEach((_,i)=>perchBird(i));for(let j=8;j<PERCHED;j++)hide(critters,j);updateLife();
  // Lote 5.9 (adendo): tilt-shift on a desktop strip (900 px or more), the miniature look of a diorama. The scene is drawn with the
  // antialias of the canvas and copied to a texture; one quad blurs only the bands at the top and the bottom (12 taps on a spiral,
@@ -451,7 +485,7 @@ void RE_IndirectDiffuse_Lambert(const in vec3 irradiance,const in vec3 geometryP
    const c=s.badge.getWorldPosition(spot),h=s.badge.visible?s.badge.scale.x/2:0;
    [[-1,-1],[1,-1],[1,1],[-1,1]].forEach(([a,b],j)=>{for(let k=0;k<3;k++)badgePos[s.index*12+j*3+k]=c.getComponent(k)+(camRight.getComponent(k)*a+camUp.getComponent(k)*b)*h;});
   }
-  for(const s of stops)glow.setMatrixAt(3+s.index,s.lamp.visible?matrixOf([...s.lamp.getWorldPosition(spot).toArray(),.36,.36,.36,0,0,0]):hidden);glow.instanceMatrix.needsUpdate=true;
+  for(const s of stops)glow.setMatrixAt(2+s.index,s.lamp.visible?matrixOf([...s.lamp.getWorldPosition(spot).toArray(),.36,.36,.36,0,0,0]):hidden);glow.instanceMatrix.needsUpdate=true;
   for(const k in markers)markers[k].instanceMatrix.needsUpdate=true;badgeGeo.attributes.position.needsUpdate=true;
  }
  function drawBadge(stop,{state,zone,glyph:mark}){// Lote 5.10: the bridge may pass the symbol, the same as in the list and the legend
@@ -511,6 +545,12 @@ void RE_IndirectDiffuse_Lambert(const in vec3 irradiance,const in vec3 geometryP
  function bounds(){const r=rectOf();shortNow=compact&&r.height<170;closeNow=!shortNow&&r.width>=900;if(shortNow)return {lo:r.height/168,hi:r.height/60};if(closeNow)return {lo:r.height/(2*T.MathUtils.clamp(.3*r.height,80,240)),hi:9};return r.width<600&&r.height>=170?{lo:r.height/116,hi:r.height>=200?r.height/91:9}:{lo:Math.max(1.6,r.height*FIGURE_UNITS/260),hi:9};}
  const rumoAt=i=>new T.Vector3(stops[i].x,stops[i].y,stops[i].z);
  // Lote 5.8: on a desktop strip the focus also holds the next stop, so the frame shows the stretch of the climb ahead.
+ // Lote 6.2 (QA A1, A2 e M14): the place of the world is framed too, and with the neighbours the one built before it. 4th Y round:
+ // the place does not set the zoom (in a short strip it pushed Rumo below the sizes of 5.7 and 5.8 and under the camera buttons);
+ // it only moves the centre, as far as every box the zoom was fitted on stays whole above the buttons.
+ function lean(c,make,pull){if(!pull.length)return c;const r=rectOf(),half=c.half,w=half*r.width/r.height,unit=r.height/(2*half),pad=4/unit,ib=insetBottom/unit,req=make(unit),all=[...req,...pull];
+  const lo=(bs,k)=>Math.min(...bs.map(b=>b[k])),hi=(bs,k)=>Math.max(...bs.map(b=>b[k])),x0=hi(req,1)+pad-w,x1=lo(req,0)-pad+w,y0=hi(req,3)+pad-half,y1=lo(req,2)-pad-ib+half;
+  if(x0>x1+1e-6||y0>y1+1e-6)return c;return {...c,cx:T.MathUtils.clamp((lo(all,0)+hi(all,1))/2,x0,x1),cy:T.MathUtils.clamp((lo(all,2)+hi(all,3))/2-ib/2,y0,y1)};}
  function focusBoxes(i,unit,neighbours){const g=shortNow?null:LAND_GUIDE[i],bs=[figureBox(rumoAt(i),unit),...stopBoxes(i)];if(g)bs.push(figureBox(guides[g],unit));if(neighbours)for(const j of [i-1,i+1])if(stops[j])bs.push(stopBoxes(j)[0]);if(!neighbours&&!shortNow&&stops[i+1]&&rectOf().width>=900)bs.push(stopBoxes(i+1)[0]);return bs;}
  // One zoom for the seven stops (the frame does not breathe between them): the largest that fits each stop with its guide.
  // Lote 5.8: on a strip of 600 px or more, the one zoom also counts, for each stop, the guides of other lands that fall within
@@ -518,14 +558,15 @@ void RE_IndirectDiffuse_Lambert(const in vec3 irradiance,const in vec3 geometryP
  // Clareira and Moinho focus. Phones and the short strips keep the zoom of Lote 5.7.
  // In a phase passage the bridge keeps the guide of the finished land in the frame (keepGuide), to see him celebrate.
  const closeBoxes=(i,u)=>[figureBox(rumoAt(i),u),...stopBoxes(i),...(stops[i+1]?[stopBoxes(i+1)[0]]:[]),...(guides[keepGuide]?[figureBox(guides[keepGuide],u)]:[])];
- function frameFocus(i){basis();const {lo,hi}=bounds(),strip=rectOf();if(closeNow){const c=fit(u=>closeBoxes(i,u),lo,hi);return {center:centerAt(c.cx,c.cy),half:c.half};}const reach=strip.width>=600&&!shortNow?lo*strip.width/strip.height:0;let half=lo;
+ function frameFocus(i){basis();const {lo,hi}=bounds(),strip=rectOf();if(closeNow){const c=lean(fit(u=>closeBoxes(i,u),lo,hi),u=>closeBoxes(i,u),siteScreen(i));return {center:centerAt(c.cx,c.cy),half:c.half};}const reach=strip.width>=600&&!shortNow?lo*strip.width/strip.height:0;let half=lo;
   const reachable=j=>Object.entries(guides).filter(([n,g])=>n!==LAND_GUIDE[j]&&Math.abs(sx(g)-sx(rumoAt(j)))<reach).map(([,g])=>g);
   for(let j=0;j<7;j++)half=Math.max(half,fit(u=>[...focusBoxes(j,u,false),...reachable(j).map(g=>figureBox(g,u))],lo,hi).half);
-  const wide=fit(u=>focusBoxes(i,u,true),half,half),near=wide.need<=half*1.001;let f=near?wide:fit(u=>focusBoxes(i,u,false),half,half);
+  const wide=fit(u=>focusBoxes(i,u,true),half,half),near=wide.need<=half*1.001;let fb=u=>focusBoxes(i,u,near),f=near?wide:fit(fb,half,half);
   // A guide of another land whose middle falls in the frame comes in whole, when it fits: at Bifurcação on a wide screen the
   // frame shows all three, and none may lose the head at the top edge (QA M2).
   const r=rectOf(),w=half*r.width/r.height,extra=Object.entries(guides).filter(([n,g])=>!shortNow&&n!==LAND_GUIDE[i]&&Math.abs(sx(g)-f.cx)<w).map(([,g])=>g);
-  if(extra.length){const e=fit(u=>[...focusBoxes(i,u,near),...extra.map(g=>figureBox(g,u))],half,half,2);if(e.need<=half*1.001)f=e;}
+  if(extra.length){const eb=u=>[...focusBoxes(i,u,near),...extra.map(g=>figureBox(g,u))],e=fit(eb,half,half,2);if(e.need<=half*1.001){f=e;fb=eb;}}
+  f=lean(f,fb,[...siteScreen(i),...(near&&i>0?siteScreen(i-1):[])]);
   // No character cut by a side edge either: the frame slides sideways, as little as it can and keeping Rumo, the stop and
   // the guide of the land inside, until each other guide is either whole in the frame or out of it.
   const unit=r.height/(2*half),pad=4/unit,req=focusBoxes(i,unit,false),lo2=Math.max(...req.map(b=>b[1]))+pad-w,hi2=Math.min(...req.map(b=>b[0]))-pad+w,top=f.cy+half-pad,bottom=f.cy-half+insetBottom/unit+pad;
@@ -537,6 +578,8 @@ void RE_IndirectDiffuse_Lambert(const in vec3 irradiance,const in vec3 geometryP
  // each side. A phone keeps 6 px and leaves the end landmarks out: the scale grows and the stops stand farther apart, so
  // the guides keep clear of Rumo at any stop (QA M1). Lote 5.8: a landmark is framed by the box of its pieces, so the
  // binoculars of the Mirante, at the top right of the climb, stay whole.
+ // Lote 6.2: the box of each place, in the screen units of the frame and (for the labels of the bridge) in one world box.
+ const siteScreen=i=>markBox['mundo'+(i+1)]?.length?[screenBox(markBox['mundo'+(i+1)])]:[];let sites=null;const siteBoxes=()=>sites??=stops.map((_,i)=>(markBox['mundo'+(i+1)]||[]).reduce((u,b)=>u.union(b),new T.Box3()));
  const corner=new T.Vector3(),screenBox=parts=>{let x0=1e9,x1=-1e9,y0=1e9,y1=-1e9;for(const b of parts)for(let k=0;k<8;k++){corner.set(k&1?b.max.x:b.min.x,k&2?b.max.y:Math.max(.13,b.min.y),k&4?b.max.z:b.min.z);const a=sx(corner),c=sy(corner);x0=Math.min(x0,a);x1=Math.max(x1,a);y0=Math.min(y0,c);y1=Math.max(y1,c);}return [x0,x1,y0,y1];};
  // A strip so wide that the frame with the end landmarks would pass the width of the forest (with the climb, 1280×720 and
  // 1366×768) frames the stops and the four without them: the limit of the forest then never cuts a stop or a character.
@@ -552,7 +595,8 @@ void RE_IndirectDiffuse_Lambert(const in vec3 irradiance,const in vec3 geometryP
  // Screen points for the SVG layer, in CSS pixels of the canvas; unit = pixels per world unit at the current zoom.
  const toScreen=(v,rect)=>{const p=v.clone().project(camera);return {x:(p.x+1)/2*rect.width,y:(1-p.y)/2*rect.height,z:p.z};};
  function anchors(rect=host.getBoundingClientRect()){return {width:rect.width,height:rect.height,unit:rect.height/(camera.top-camera.bottom),figMax:figMax(),short:shortNow,close:closeNow&&(!overview||!!cam),inset:insetBottom,rumo:toScreen(piecePos,rect),
-  guides:Object.fromEntries(Object.entries(guides).map(([n,v])=>[n,toScreen(v,rect)])),stops:stops.map(s=>toScreen(new T.Vector3(s.x,s.y+.01,s.z),rect))};}
+  guides:Object.fromEntries(Object.entries(guides).map(([n,v])=>[n,toScreen(v,rect)])),stops:stops.map(s=>toScreen(new T.Vector3(s.x,s.y+.01,s.z),rect)),
+  sites:siteBoxes().map(b=>{let x0=1e9,x1=-1e9,y0=1e9,y1=-1e9;for(let k=0;k<8;k++){const p=toScreen(corner.set(k&1?b.max.x:b.min.x,k&2?b.max.y:b.min.y,k&4?b.max.z:b.min.z),rect);x0=Math.min(x0,p.x);x1=Math.max(x1,p.x);y0=Math.min(y0,p.y);y1=Math.max(y1,p.y);}return {x:x0,y:y0,w:x1-x0,h:y1-y0};})};}
  const direction=(a,b)=>curve.getPointAt(b).project(camera).x>=curve.getPointAt(a).project(camera).x?1:-1;
  function schedule(){if(!manual&&!raf&&running()&&busy())raf=requestAnimationFrame(tick);}
  function view(){onView({overview,exploring,selected});}
@@ -617,7 +661,16 @@ void RE_IndirectDiffuse_Lambert(const in vec3 irradiance,const in vec3 geometryP
   if(!walk)onWalk({type:'arrive',index,walked:false,moved:false});
  }
  const ringColor=new T.Color(),flagColor=new T.Color();
- function paintStops(next){states=next.map((s,i)=>({...states[i],...s}));for(const s of stops){const st=states[s.index];drawBadge(s,st);markers.ring.setColorAt(s.index,ringColor.set(st.state==='foco'?colors.sun:ZONES[st.zone]||colors.ivory));markers.flag.setColorAt(s.index,flagColor.set(st.state==='guardado'?colors.sun:ZONES[st.zone]||colors.coral));const down=st.state==='bloqueada';s.flag.position.y=down?.62:1.12;s.flag.scale.x=down?.55:1;}markers.ring.instanceColor.needsUpdate=true;markers.flag.instanceColor.needsUpdate=true;render();}
+ // Lote 6.2: world 1 under works or finished. The bridge says which, with the state of the stops.
+ function setBuilt(on){miniMesh.obras.visible=!on;miniMesh.pronta.visible=miniMesh.cones.visible=miniMesh.water.visible=miniFlag.visible=on;}
+ // Lote 6.2: entering a world, the camera closes on its place (the bridge fades the world in over it, and a touch ends both); leaving, it
+ // comes back from there to the stop, with Rumo in his place. Without motion, the camera just goes back.
+ // QA M8: the place stands above the camera buttons, as in the focus, so Rumo in front of it does not pass behind them.
+ const siteFrame=i=>{basis();const {x,z}=siteAt[i],p=new T.Vector3(x,siteY[i]+.3,z),r=rectOf(),half=Math.max(.95,1.15/(r.width/r.height));return {to:centerAt(sx(p),sy(p)-insetBottom*half/r.height),half};};
+ function dive(i,dur){if(!motion||!running()||!siteAt[i])return false;walk=null;intro=null;const {to,half}=siteFrame(i);cam={from:center.clone(),to,t:0,dur,ease:smooth,h0:lastHalf||focusHalf,h1:half};schedule();return true;}
+ function emerge(i,dur=0){const s=siteFrame(i);overview=false;zoom=1;framed=true;const f=frameFocus(selected);focusHalf=f.half;aim=f.center;center.copy(f.center);cam=null;
+  if(dur&&motion&&running()){center.copy(s.to);cam={from:s.to,to:f.center,t:0,dur,ease:smooth,h0:s.half,h1:f.half};schedule();}render();view();}
+ function paintStops(next){states=next.map((s,i)=>({...states[i],...s}));setBuilt(!!states[0].built);for(const s of stops){const st=states[s.index];drawBadge(s,st);markers.ring.setColorAt(s.index,ringColor.set(st.state==='foco'?colors.sun:ZONES[st.zone]||colors.ivory));markers.flag.setColorAt(s.index,flagColor.set(st.state==='guardado'?colors.sun:ZONES[st.zone]||colors.coral));const down=st.state==='bloqueada';s.flag.position.y=down?.62:1.12;s.flag.scale.x=down?.55:1;}markers.ring.instanceColor.needsUpdate=true;markers.flag.instanceColor.needsUpdate=true;render();}
  function advance(dt){
   if(!running())return;const c0=performance.now(),ambientDt=Math.min(dt,12-ambient);ambient+=ambientDt;ambientPhase+=ambientDt;if(ambientDt>0)lifeStep(ambientDt);
   if(burst)stepBurst(dt);
@@ -675,14 +728,14 @@ void RE_IndirectDiffuse_Lambert(const in vec3 irradiance,const in vec3 geometryP
   skipIntro:()=>endIntro(true),
   // Lote 5.9: a tap on a stop sends a gust there; with a text field in focus the scene goes calm (wind 15%, critters slower).
   // Lote 5.11: the confetti of a finished phase; a tap that skips the passage ends it at once.
-  confetti,endConfetti(){if(!burst)return;endBurst();render();},
+  dive,emerge,confetti,endConfetti(){if(!burst)return;endBurst();render();},
   gust,setCalm(value){if(calm===!!value)return;calm=!!value;if(ambient<12)schedule();},
   // The passage ends: the guide of the finished land no longer holds the frame.
   setKeep(name=null){if(keepGuide===name)return;const from=center.clone(),h0=lastHalf;keepGuide=name;reframe();
    if(rectOf().width>=900&&motion&&running()&&!overview&&h0&&!walk){cam={from,to:center.clone(),t:0,dur:.3,ease:smooth,h0,h1:focusHalf};center.copy(from);schedule();}render();},
   setMotion(value){motion=value;if(!value){stop();settle();endIntro();render();}else schedule();},setManual(value){manual=value;stop();if(!value)schedule();},
-  state:()=>({ready:true,confetti:burst?burst.p.length:0,compact,short:shortNow,close:closeNow,intro:!!intro,selected,piece:piecePos.toArray(),stopPositions:stops.map(s=>[s.x,s.z]),stopHeights:stops.map(s=>s.y),states:states.map(s=>s.state),hop:!!walk,cam:!!cam,frames,active:activeScene,visible,motion,lost,tiles:tiles.length,heights:[...new Set(tiles.map(t=>t.height))],zoom,angle,center:center.toArray(),overview,exploring,ambient,tilt:tilt.on,metrics:{...metrics},life:{t:lifeT,live,amp:U.uAmp.value,calm,gust:U.uGust.value.z,fire:boost(),bloom:U.uBloom.value.z,birdsAway:birdAge.filter(a=>a!==null).length,flock:flock>=0,fish:fishOn,wheel:wheelSpeed},triangles:renderer.info.render.triangles,calls:renderer.info.render.calls}),
-  raw:()=>({renderer,scene,camera,piece,stops,targets,curve,trail,wheel,stream,flags,guides,landmarks,markBox,millBox,scenery,tilt,life:{uniforms:U,critters,puffs,clouds,flames,blades,perches,lanterns,reeds,blobs,glow},field:FIELD,toTrail:ST}),
+  state:()=>({ready:true,confetti:burst?burst.p.length:0,compact,short:shortNow,close:closeNow,intro:!!intro,selected,piece:piecePos.toArray(),stopPositions:stops.map(s=>[s.x,s.z]),stopHeights:stops.map(s=>s.y),states:states.map(s=>s.state),hop:!!walk,cam:!!cam,frames,active:activeScene,visible,motion,lost,tiles:tiles.length,heights:[...new Set(tiles.map(t=>t.height))],zoom,angle,center:center.toArray(),overview,exploring,ambient,tilt:tilt.on,metrics:{...metrics},life:{t:lifeT,live,amp:U.uAmp.value,calm,gust:U.uGust.value.z,bloom:U.uBloom.value.z,birdsAway:birdAge.filter(a=>a!==null).length,flock:flock>=0,fish:fishOn,wheel:wheelSpeed},triangles:renderer.info.render.triangles,calls:renderer.info.render.calls}),
+  raw:()=>({renderer,scene,camera,piece,stops,targets,curve,trail,wheel,stream,flags,guides,landmarks,markBox,millBox,scenery,tilt,life:{uniforms:U,critters,puffs,clouds,blades,perches,lanterns,reeds,blobs,glow},mini:{...miniMesh,flag:miniFlag},siteAt,siteY,bridge:BR,field:FIELD,toTrail:ST}),
   dispose(){disposed=true;stop();endBurst();burstGeo.dispose();burstMat.dispose();resizeObserver.disconnect();observer.disconnect();document.removeEventListener('visibilitychange',visibility);release(scene);release(tilt.scene);tilt.tex?.dispose();renderer.dispose();canvas.remove();}
  };
 }};

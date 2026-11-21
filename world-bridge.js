@@ -73,7 +73,7 @@ function layoutMap(a){
 // Lote 5.10: os rótulos têm texto de tamanho fixo (14 px) e ficam fora do desenho: embaixo dos pés, em cima da cabeça ou do
 // lado, dentro da faixa acima dos botões, sem cobrir um personagem, o botão de dicas nem outro rótulo. Primeiro o "Você está
 // aqui", depois os nomes; um nome que não cabe em lugar nenhum, ou cujo personagem saiu do quadro, não aparece.
-let guideBox=null;
+let guideBox=null,camBoxes=[];
 // Lote 5.11 (QA M3 e B8): o aviso da comemoração fica na base do mapa (no celular em pé, sobre a faixa dos botões da câmera, que o
 // enquadramento deixa livre) e sobe para o alto quando o Rumo ficaria embaixo dele (deitado não há essa faixa). Os nomes desviam dele.
 function cheerBox(a){
@@ -87,11 +87,16 @@ function layoutTags(a){
  // QA M6 (17/10): o nome de um personagem fica a pelo menos 10 px dos outros desenhos, para não parecer o nome do vizinho. O
  // "Você está aqui" não tem essa margem: no mapa curto do celular ele deixava de caber.
  figs.forEach(f=>f.on&&taken.push({...f.box,dono:f.n}));
- const free=(r,dono,pad)=>r.x>=2&&r.y>=2&&r.x+r.w<=a.width-2&&r.y+r.h<=floor-2&&!taken.some(q=>{const g=q.dono&&q.dono!==dono?pad:0;return r.x<q.x+q.w+g&&q.x-g<r.x+r.w&&r.y<q.y+q.h+g&&q.y-g<r.y+r.h;});
- const place=(el,f,order,pad=10)=>{const w=el.offsetWidth,h=el.offsetHeight,{p,box}=f,mid=box.y+box.h/2-h/2;
-  const spots={below:{x:p.x-w/2,y:box.y+box.h+2},above:{x:p.x-w/2,y:box.y-h-2},right:{x:box.x+box.w+2,y:mid},left:{x:box.x-w-2,y:mid}};
-  const r=f.on&&order.map(s=>({...spots[s],w,h})).find(q=>free(q,f.n,pad));el.style.visibility=r?'':'hidden';if(!r)return;taken.push(r);el.style.transform=`translate(${Math.round(r.x)}px,${Math.round(r.y)}px)`;};
- place(tags.querySelector('.map-here'),figs[3],['above','left','right','below'],0);
+ // Lote 6.2 (QA A4, A5, M4 e M9): os rótulos também não cobrem o lugar de um mundo (a obra ou a miniatura). Primeiro em volta do
+ // personagem sem cobrir lugar; o "Você está aqui" tenta ainda os cantos de baixo, com a faixa dos botões livre onde não há botão;
+ // só então vale a regra do 5.10, sem os lugares, para nenhum rótulo sumir por causa deles.
+ const sites=a.sites||[],hit=(r,q,g)=>r.x<q.x+q.w+g&&q.x-g<r.x+r.w&&r.y<q.y+q.h+g&&q.y-g<r.y+r.h;
+ const free=(r,dono,pad,low=floor,more=[])=>r.x>=2&&r.y>=2&&r.x+r.w<=a.width-2&&r.y+r.h<=low-2&&!taken.some(q=>hit(r,q,q.dono&&q.dono!==dono?pad:0))&&!more.some(q=>hit(r,q,2));
+ const place=(el,f,order,pad=10,extra=[])=>{const w=el.offsetWidth,h=el.offsetHeight,{p,box}=f,mid=box.y+box.h/2-h/2,low=box.y+box.h-h;
+  const spots={below:{x:p.x-w/2,y:box.y+box.h+2},above:{x:p.x-w/2,y:box.y-h-2},right:{x:box.x+box.w+2,y:mid},left:{x:box.x-w-2,y:mid},lowRight:{x:box.x+box.w+2,y:low},lowLeft:{x:box.x-w-2,y:low}},at=s=>({...spots[s],w,h});
+  const tries=f.on?[...order.map(s=>[at(s),floor,sites]),...extra.map(s=>[at(s),a.height,[...sites,...camBoxes]]),...order.map(s=>[at(s),floor,[]])]:[];
+  const r=tries.find(([q,lo,more])=>free(q,f.n,pad,lo,more))?.[0];el.style.visibility=r?'':'hidden';if(!r)return;taken.push(r);el.style.transform=`translate(${Math.round(r.x)}px,${Math.round(r.y)}px)`;};
+ place(tags.querySelector('.map-here'),figs[3],['above','left','right','below'],0,['below','lowRight','lowLeft']);
  figs.forEach(f=>place(tags.querySelector(`[data-name=${f.n}]`),f,['below','above','right','left']));
 }
 function track(key,runs){mapRuns.set(key,[...(mapRuns.get(key)||[]).filter(a=>a.playState==='running'),...runs]);return runs;}
@@ -107,7 +112,7 @@ function pose(fig,key){
  for(const [sel,v] of Object.entries(p.parts)){if(sel==='.marca-velocidade'||sel==='.marca-poeira')continue;const m=fig.querySelector(sel+'>.mov');if(m){m.style.transform=T(v);if(sel.startsWith('.marca'))m.style.opacity=1;}}
 }
 function stopMapMotion(){
- finishPassage();endCheer();for(const key of [...mapRuns.keys()])stopRuns(key);mapTimers.forEach(clearTimeout);mapTimers.clear();
+ endParkPass();parkView?.setMotion(!motionOff());finishPassage();endCheer();for(const key of [...mapRuns.keys()])stopRuns(key);mapTimers.forEach(clearTimeout);mapTimers.clear();
  mapLayer?.querySelectorAll('.map-fx').forEach(e=>e.remove());mapLayer?.querySelectorAll('.companion').forEach(f=>pose(f,'repouso'));
 }
 // Efeito preso a uma parada (índice) ou ao Rumo; sai do DOM quando acaba ou é cancelado.
@@ -181,7 +186,9 @@ function paintWorld(){
   const key=look==='fechada'?'lock':glyph;if(b.dataset.glyph!==key){b.innerHTML=`<span class="node-glyph">${glyph}</span>`;b.dataset.glyph=key;}
   const name=list.children[i].lastChild;name.dataset.look=look;name.lastChild.textContent=LOOK_TEXT[look];
   if(prev!==s.state)nodeEffects(b,i,prev,s.state);});
- worldView?.paintStops(d.steps.map(s=>({state:s.state,zone:STOPS[s.index].mark.land,glyph:LOOK_GLYPH[s.look]})));
+ worldView?.paintStops(d.steps.map(s=>({state:s.state,zone:STOPS[s.index].mark.land,glyph:LOOK_GLYPH[s.look],built:s.done})));
+ // Lote 6.2: quantos mundos a criança construiu, na fila. Conta tarefa feita: sem ponto nem comparação.
+ $('world-built').textContent=`${d.steps.filter(s=>s.done).length} de 7 mundos construídos`;
  const tag=mapLayer?.querySelector('.map-here');if(tag){tag.firstChild.textContent=worldName(focus);tag.lastChild.textContent=LOOK_TEXT.aqui;}if(mapAnchors)layoutTags(mapAnchors);
  paintMundoPanel(d);
 }
@@ -205,7 +212,7 @@ function syncWorld(){
  if(worldFailed){maybeTips();return;}
  if(!worldView){
   if(worldLoading)return;worldLoading=true;
-  const script=document.createElement('script');script.src='media/world/bosque.bundle.js?v=17';
+  const script=document.createElement('script');script.src='media/world/bosque.bundle.js?v=20';
   script.onerror=()=>worldFallback('Não foi possível abrir o 3D. As paradas e as perguntas continuam disponíveis.');
   script.onload=()=>{try{buildMapLayer();worldView=Bosque.create($('world-viewport'),{onSelect:goStop,onError:worldFallback,onView:paintWorldCamera,onFrame:layoutMap,onWalk:onRumoWalk});window.mapWorld=worldView;measureInsets();$('world-viewport').dataset.ready='true';paintWorld();mapQuiet=true;worldView.select(mundosDomain().atual,{instant:true});mapQuiet=false;syncWorld();worldView.intro();maybeTips();}catch{worldFallback('Seu navegador não abriu o 3D. Use a lista de paradas.');}};
   document.head.append(script);return;
@@ -218,7 +225,8 @@ window.refreshWorld=syncWorld;
 // A grade de "Ajustar visão" aberta não conta: ela abre por cima e fecha logo.
 function measureInsets(){
  const vp=$('world-viewport').getBoundingClientRect();if(!worldView||!vp.height)return;
- const tops=[...$('world-camera').querySelectorAll(':scope>button,.world-adjust>summary')].filter(e=>e.checkVisibility()).map(e=>e.getBoundingClientRect()).filter(r=>r.top<vp.bottom&&r.bottom>vp.top).map(r=>r.top);
+ const rs=[...$('world-camera').querySelectorAll(':scope>button,.world-adjust>summary')].filter(e=>e.checkVisibility()).map(e=>e.getBoundingClientRect()).filter(r=>r.top<vp.bottom&&r.bottom>vp.top),tops=rs.map(r=>r.top);
+ camBoxes=rs.map(r=>({x:r.left-vp.left-4,y:r.top-vp.top-4,w:r.width+8,h:r.height+8}));
  // Lote 5.10: os rótulos do mapa não ficam sob o botão "Dicas", no canto de cima.
  const g=$('world-guide-open').getBoundingClientRect();guideBox=g.width?{x:g.left-vp.left-4,y:g.top-vp.top-4,w:g.width+8,h:g.height+8}:null;
  worldView.setInsets({bottom:tops.length?Math.max(0,vp.bottom-Math.min(...tops)):0});

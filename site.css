@@ -106,7 +106,7 @@ html:has(#bosque:not([hidden])){scroll-padding-top:var(--top-h,78px)}
    espremia o mapa sobre a fila (QA A2). */
 #world-stage .world-scene{grid-area:scene;position:relative;top:auto;align-self:stretch;display:flex;flex-direction:column;overflow:clip;margin-bottom:6px;border-radius:24px}
 #world-stage .world-viewport{flex:none;height:36vh;height:36svh;min-height:0}
-#world-stage .world-camera{bottom:60px;z-index:1}
+#world-stage .world-camera{bottom:82px;z-index:1}
 /* QA M4: os oito botões de ajuste abrem numa grade compacta acima de "Ajustar visão", e o mapa continua à vista. */
 #world-stage .world-adjust[open]{flex-basis:auto;padding:0}
 #world-stage .world-adjust-buttons{position:absolute;right:0;bottom:calc(100% + 6px);display:grid;grid-template-columns:repeat(4,44px);gap:4px;padding:4px;border:2px solid var(--line);border-radius:12px;background:var(--white)}
@@ -603,7 +603,7 @@ body[data-programa=filho] #trilha :is(.station-degree,.dock-bearing,.map-directi
 .mundo-lugar{display:flex;align-items:center;gap:10px;width:100%;min-height:52px;padding:6px 12px 6px 6px;border:2px solid var(--line);border-radius:var(--radius-control);background:var(--white);color:var(--ink);font:inherit;text-align:left;cursor:pointer;box-shadow:0 3px 0 var(--line-deep)}
 .mundo-lugar .node-glyph{display:grid;place-items:center;flex:none;width:36px;height:36px;border:2px solid var(--ink);border-radius:50%;font-weight:900;background:var(--white)}
 .mundo-lugar[data-feito=true] .node-glyph{background:var(--leaf);border-color:var(--leaf-deep);color:var(--ink)}
-.mundo-lugar>span{min-width:0;overflow-wrap:anywhere}.mundo-lugar b{display:block;font-size:15px}
+.mundo-lugar>span{min-width:0;overflow-wrap:break-word}.mundo-lugar b{display:block;font-size:15px}
 .mundo-lugar small{display:block;font-size:14px;color:var(--muted);font-weight:800}
 .mundo-lugar:focus-visible,.mundo-pro:focus-visible,.mundo-tirar:focus-visible{outline:3px solid var(--ink);outline-offset:2px}
 @media(hover:hover){.mundo-lugar:hover,.mundo-pro:not([data-on]):hover{background:var(--cream)}}
@@ -626,10 +626,10 @@ body[data-programa=filho] #trilha :is(.station-degree,.dock-bearing,.map-directi
 .mundo-vol :is(.btn,.back){min-height:44px;padding:8px 14px;font-size:15px}
 #world-stage .mundo-fields .mundo-dica{font-size:14px;color:var(--muted)}
 .mundo-pros{list-style:none;display:grid;grid-template-columns:repeat(auto-fill,minmax(min(100%,150px),1fr));gap:8px;margin:0;padding:0}
-.mundo-pro{display:flex;align-items:center;gap:8px;width:100%;min-height:52px;padding:6px 10px;border:2px solid var(--ink);border-radius:var(--radius-control);background:var(--white);color:var(--ink);font:inherit;font-size:14px;font-weight:900;line-height:1.2;text-align:left;cursor:grab;touch-action:none;user-select:none;box-shadow:0 3px 0 var(--line-deep)}
+.mundo-pro{display:flex;align-items:center;gap:6px;width:100%;min-height:52px;padding:6px 8px 6px 6px;border:2px solid var(--ink);border-radius:var(--radius-control);background:var(--white);color:var(--ink);font:inherit;font-size:14px;font-weight:900;line-height:1.2;text-align:left;cursor:grab;touch-action:none;user-select:none;box-shadow:0 3px 0 var(--line-deep)}
 .mundo-pro .pro-fig{flex:none;width:32px;height:32px}
 .mundo-pro small{display:block;font-size:14px;font-weight:800;color:var(--ink)}
-.mundo-pro>span{display:block;min-width:0;overflow-wrap:anywhere}
+.mundo-pro>span{display:block;min-width:0;overflow-wrap:break-word}
 .mundo-pro[aria-pressed=true]{background:var(--sun);border-color:var(--ink)}
 .mundo-pro[data-on]{border-style:dashed;border-color:var(--line-deep);box-shadow:none;cursor:default}
 .mundo-pro[data-dragging]{opacity:.4}
@@ -648,16 +648,31 @@ body[data-programa=filho] #trilha :is(.station-degree,.dock-bearing,.map-directi
 .world-viewport .park-canvas{cursor:pointer}
 #world-stage:not([data-park]) .world-viewport>.park-canvas,#world-stage:not([data-park]) .park-tags{display:none}
 #world-stage[data-park] .world-viewport>canvas:not(.park-canvas),#world-stage[data-park] .world-viewport>img,#world-stage[data-park] .world-layer,#world-stage[data-park] .passage-note,#world-stage[data-park] :is(#world-camera,#world-guide-open){display:none}
-#world-stage[data-park] .world-viewport{background:#3a6690}
-.park-tags{position:absolute;inset:0;z-index:1;overflow:hidden;pointer-events:none}
-.park-tag{position:absolute;left:0;top:0;display:flex;flex-direction:column;align-items:center;padding:1px 8px;border:2px solid var(--line);border-radius:12px;background:var(--white);color:var(--ink);font-size:14px;font-weight:900;line-height:1.2;white-space:nowrap}
+#world-stage[data-park] .world-viewport{background:#69ae72}
+/* Lote 6.2: na passagem de entrada e saída do mundo os dois quadros ficam à vista, o parque por cima do bosque. */
+#world-stage[data-park-pass] .world-viewport>canvas:not(.park-canvas),#world-stage[data-park-pass] .world-layer,#world-stage[data-park-pass=out] .world-viewport>.park-canvas{display:block}
+#world-stage[data-park-pass] .world-viewport>.park-canvas{z-index:1;pointer-events:none}
+.world-built{margin:0;padding:0 8px 4px;font-size:14px;font-weight:800;line-height:18px;text-align:center;color:var(--ink)}
+#world-stage[data-park] .world-built{display:none}
+@media(max-height:640px) and (min-aspect-ratio:4/3){#world-stage .world-built{position:absolute;right:10px;bottom:8px;width:112px;padding:0;text-align:right}#world-stage[data-park] .world-scene{padding-bottom:0}}
+.park-tags{position:absolute;inset:0;z-index:2;overflow:hidden;pointer-events:none}
+.park-tag{position:absolute;left:0;top:0;display:flex;flex-direction:column;align-items:center;padding:1px 8px;border:2px solid var(--line);border-radius:12px;background:var(--white);color:var(--ink);font-size:14px;font-weight:900;line-height:1.2;white-space:nowrap;pointer-events:auto;cursor:pointer}
 .park-tag small{font-size:14px;font-weight:800}
+.park-tag i{display:none;font-style:normal}
 .park-tag[data-feito=true]{border-color:var(--leaf-deep)}
+.park-tag[data-aqui]{background:var(--sun);border-color:var(--ink)}
+.park-tag[data-nivel=nome] small{display:none}
+.park-tag[data-nivel=nome][data-feito=true] b:before{content:'✓ '}
+.park-tag[data-nivel=selo]{justify-content:center;width:28px;height:28px;padding:0;border-radius:50%}
+.park-tag[data-nivel=selo] :is(b,small){display:none}
+.park-tag[data-nivel=selo] i{display:block}
+@media(max-width:599px){.park-tag[data-feito=true] b:before{content:'✓ '}}
 /* QA B4 (6.1): no celular o nome do lugar e o do profissional cabem no cartão; deitado e até 360 px o desenho do profissional sai do cartão (fica na equipe). */
 @media(max-width:599px){.mundo-lugar{gap:8px;padding-left:4px}.mundo-lugar .node-glyph{width:30px;height:30px}.mundo-lugar b{font-size:14px}.mundo-pro{padding:6px 8px;gap:6px}}
 @media(max-width:374px),(max-height:640px) and (min-aspect-ratio:4/3){.mundo-pros .pro-fig{display:none}}
-@media(max-width:599px){#world-stage .mundo-fields{padding:4px 12px 10px}#world-stage .mundo-fields h1{font-size:20px}#world-stage .mundo-fields[data-view=lugar] h1{font-size:18px}#world-stage .mundo-fields p{font-size:14px}.mundo-lugares,.mundo-pros{grid-template-columns:repeat(2,minmax(0,1fr))}.mundo-lugar{padding-right:6px}.park-tag small{display:none}}
-@media(max-height:640px) and (min-aspect-ratio:4/3){#world-stage .mundo-fields{padding:2px 16px 8px}#world-stage .mundo-fields h1{font-size:18px}#world-stage .mundo-fields[data-view=lugar] h1{font-size:16px}#world-stage .mundo-fields[data-view=lugar]>.eyebrow{display:none}#world-stage .mundo-lugares{grid-template-columns:repeat(2,minmax(0,1fr))}#world-stage .mundo-fields .mundo-dica{position:absolute;width:1px;height:1px;margin:-1px;overflow:hidden;clip-path:inset(50%);white-space:nowrap}.mundo-pro,.mundo-lugar{min-height:44px}.mundo-lugares,.mundo-pros{grid-template-columns:repeat(3,minmax(0,1fr))}.park-tag small{display:none}}
+/* Lote 6.2 (QA P4 e P11): a palavra mais longa do nome nunca quebra no meio; no celular, a coluna dos lugares cresce até caber nela. Deitado, o rótulo do parque sem o estado ganha o ✓ (QA M10). */
+@media(max-width:599px){#world-stage .mundo-fields{padding:4px 12px 10px}#world-stage .mundo-fields h1{font-size:20px}#world-stage .mundo-fields[data-view=lugar] h1{font-size:18px}#world-stage .mundo-fields p{font-size:14px}.mundo-lugares{grid-template-columns:repeat(2,auto)}.mundo-pros{grid-template-columns:repeat(2,minmax(0,1fr))}.mundo-lugar{padding-right:6px}.park-tag small{display:none}}
+@media(max-height:640px) and (min-aspect-ratio:4/3){#world-stage .mundo-fields{padding:2px 16px 8px}#world-stage .mundo-fields h1{font-size:18px}#world-stage .mundo-fields[data-view=lugar] h1{font-size:16px}#world-stage .mundo-fields[data-view=lugar]>.eyebrow{display:none}#world-stage .mundo-lugares{grid-template-columns:repeat(2,minmax(0,1fr))}#world-stage .mundo-fields .mundo-dica{position:absolute;width:1px;height:1px;margin:-1px;overflow:hidden;clip-path:inset(50%);white-space:nowrap}.mundo-pro,.mundo-lugar{min-height:44px}.mundo-lugares,.mundo-pros{grid-template-columns:repeat(3,minmax(0,1fr))}.park-tag small{display:none}.park-tag[data-feito=true] b:before{content:'✓ '}}
 @media (min-width:700px) and (min-height:641px),(min-width:700px) and (max-aspect-ratio:4/3){#world-stage .mundo-fields[data-view=lugar]{display:grid;grid-template-columns:minmax(0,1fr) minmax(0,1fr);column-gap:24px;align-content:start;align-items:start}#world-stage .mundo-fields[data-view=lugar]>*{grid-column:1/-1}#world-stage .mundo-fields[data-view=lugar]>.mundo-dica{grid-column:1;grid-row:3}#world-stage .mundo-fields[data-view=lugar]>.mundo-pros{grid-column:1;grid-row:4/7;grid-template-columns:repeat(2,minmax(0,1fr))}#world-stage .mundo-fields[data-view=lugar]>.mundo-equipe{grid-column:2;grid-row:3/5;margin-top:0}#world-stage .mundo-fields[data-view=lugar]>.mundo-fala{grid-column:2;grid-row:5;margin-top:0}#world-stage .mundo-fields[data-view=lugar] h1{font-size:20px}}
 @media (min-width:1100px) and (min-height:641px){#world-stage .mundo-fields[data-view=lugar]{grid-template-columns:minmax(0,1.1fr) minmax(0,1fr) minmax(0,1fr)}#world-stage .mundo-fields[data-view=lugar]>.mundo-fala{grid-column:3;grid-row:3/7}#world-stage .mundo-fields[data-view=lugar]>.mundo-equipe{grid-row:3/7}}
 @media (min-width:700px) and (min-height:641px),(min-width:700px) and (max-aspect-ratio:4/3){#world-stage .mundo-fields[data-view=fechamento]{display:grid;grid-template-columns:minmax(0,1fr) minmax(0,1fr);column-gap:32px;align-content:start;align-items:start}#world-stage .mundo-fields[data-view=fechamento]>*{grid-column:1}#world-stage .mundo-fields[data-view=fechamento]>:is(.mundo-sintese-titulo,.mundo-sintese){grid-column:2}#world-stage .mundo-fields[data-view=fechamento]>.mundo-sintese-titulo{grid-row:1;margin-top:2px}#world-stage .mundo-fields[data-view=fechamento]>.mundo-sintese{grid-row:2/6}}
