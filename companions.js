@@ -1,7 +1,7 @@
 // Elenco do Lote 5.3: desenhos e gestos ficam em elenco.js; aqui só os nomes que o site já usa.
 const CAST={bino:ELENCO.bino,pipa:ELENCO.pipa,teo:ELENCO.teo};
 function companion(name='rumo',state='welcome'){
- return `<span class="companion" data-character="${name}" data-state="${state}" aria-hidden="true">${castSVG(name)}</span>`;
+ return `<span class="companion" data-character="${name}" data-state="${state}"${name==='rumo'?` data-acc="${window.rumoAcc||''}"`:''} aria-hidden="true">${castSVG(name)}</span>`;
 }
 const JOURNEY='pc-journey-v1';
 function journeys(){const v=read(JOURNEY,{},sessionStorage);return v&&typeof v==='object'&&!Array.isArray(v)?v:{};}

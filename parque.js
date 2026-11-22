@@ -8,7 +8,9 @@
 // sair, o inverso, com o Rumo no lugar). O painel já está pronto no primeiro quadro, e um toque ou uma tecla terminam a passagem;
 // movimento reduzido e pausa trocam direto. Os rótulos do mapa nunca cobrem as peças: do cartão ao selo, o que couber.
 const PARK_ID='parque-aquatico';
-const park={open:false,view:'parque',lugar:-1,pick:null,fala:null,key:''};
+const park={open:false,view:'parque',lugar:-1,pick:null,fala:null,key:'',novas:[],desc:null,foto:''};
+// Lote 6.3: a vista "equipe" é o card do lugar; no mapa, o lugar continua aberto.
+const noLugar=()=>park.view==='lugar'||park.view==='equipe';
 let parkView=null,parkFailed=false;
 const parkContent=()=>Mundos.conteudo(0);
 const PRO_COLOR={administrador:'#1c2744',psicologo:'#f2534a',publicitario:'#ffc83d',fisioterapeuta:'#2ebe6a'};
@@ -17,11 +19,11 @@ const proName=(c,id)=>c.profissionais.find(p=>p.id===id)?.nome||id;
 // Painel do mundo e do parque. Rebuild só quando a vista muda; o foco volta ao mesmo controle (data-k).
 function paintMundoPanel(d=mundosDomain()){
  const host=$('mundo-fields');if(!host)return;const c=parkContent(),p=d.p,m=Mundos.doMundo(p,PARK_ID);
- const view=park.open?park.view:'mundo',key=JSON.stringify([view,d.atual,park.lugar,park.pick,park.fala,m,owner()]);
+ const view=park.open?park.view:'mundo',key=JSON.stringify([view,d.atual,park.lugar,park.pick,park.fala,m,owner(),park.novas,park.desc]);
  if(key===park.key)return;park.key=key;
  const had=document.activeElement?.closest?.('#world-stage')?document.activeElement.dataset.k:null;
  $('world-stage').toggleAttribute('data-park',park.open);$('park-places').hidden=!park.open;$('world-nodes').hidden=park.open;
- const [fields,actions]=view==='mundo'?mundoCard(d,c,m):view==='lugar'?lugarView(c,m):view==='fechamento'?fechamentoView(c,m):parqueView(c,m);
+ const [fields,actions]=view==='mundo'?mundoCard(d,c,m):view==='lugar'?lugarView(c,m):view==='equipe'?Cel.lugar(c,m,c.lugares[park.lugar],park.novas,Mundos.parqueCompleto(c,m),park.desc):view==='fechamento'?fechamentoView(c,m):parqueView(c,m);
  $('world-place-state').innerHTML=(view!=='mundo'||d.atual===0)&&c?.exemplo?EXEMPLO:'';
  host.style.paddingBottom='';host.dataset.view=view;host.innerHTML=fields;$('mundo-actions').innerHTML=actions;fillIcons(host);fillIcons($('mundo-actions'));
  if(park.open)paintPlaces(c,m);
@@ -68,11 +70,11 @@ function fechamentoView(c,m){
 // Lista de lugares na base do mapa (a mesma fila das paradas, com os lugares) e rótulos sobre o 3D.
 function paintPlaces(c,m){
  const list=$('park-places');if(list.children.length!==c.lugares.length)list.innerHTML=c.lugares.map((l,i)=>`<li><button type="button" class="world-node land-leaf" data-park-lugar="${i}" data-k="place-${i}"></button><span class="node-name" aria-hidden="true"><b>${esc(l.nome)}</b><small></small></span></li>`).join('');
- c.lugares.forEach((l,i)=>{const b=list.children[i].firstChild,t=Mundos.equipe(m,l.id).length,look=park.view==='lugar'&&park.lugar===i?'aqui':t?'feita':'aberta';b.dataset.look=look;b.innerHTML=`<span class="node-glyph">${t?'✓':i+1}</span>`;
+ c.lugares.forEach((l,i)=>{const b=list.children[i].firstChild,t=Mundos.equipe(m,l.id).length,look=noLugar()&&park.lugar===i?'aqui':t?'feita':'aberta';b.dataset.look=look;b.innerHTML=`<span class="node-glyph">${t?'✓':i+1}</span>`;
   b.toggleAttribute('aria-current',look==='aqui');b.setAttribute('aria-label',`Lugar ${i+1} de ${c.lugares.length}, ${l.nome}: ${t?`equipe com ${t}`:'sem equipe'}`);list.children[i].lastChild.lastChild.textContent=look==='aqui'?'Você está aqui':t?'Com equipe':'Sem equipe';});
- parkView?.paint(c.lugares.map(l=>({feito:Mundos.lugarFeito(m,l.id),equipe:Mundos.equipe(m,l.id).map(id=>PRO_COLOR[id]||'#5e6880')})));parkView?.select(park.view==='lugar'?park.lugar:-1);
+ parkView?.paint(c.lugares.map(l=>({feito:Mundos.lugarFeito(m,l.id),equipe:Mundos.equipe(m,l.id).map(id=>PRO_COLOR[id]||'#5e6880')})));parkView?.select(noLugar()?park.lugar:-1);
  const tags=$('world-viewport').querySelector('.park-tags');if(tags&&!tags.children.length)tags.innerHTML=c.lugares.map((l,i)=>`<span class="park-tag" data-i="${i}"><b>${esc(l.nome)}</b><small></small><i></i></span>`).join('');
- tags?.querySelectorAll('.park-tag').forEach((t,i)=>{const n=Mundos.equipe(m,c.lugares[i].id).length,aqui=park.view==='lugar'&&park.lugar===i;t.children[1].textContent=aqui?'Você está aqui':n?'✓ Com equipe':'Sem equipe';t.children[2].textContent=n?'✓':i+1;t.dataset.feito=String(n>0);t.toggleAttribute('data-aqui',aqui);});
+ tags?.querySelectorAll('.park-tag').forEach((t,i)=>{const n=Mundos.equipe(m,c.lugares[i].id).length,aqui=noLugar()&&park.lugar===i;t.children[1].textContent=aqui?'Você está aqui':n?'✓ Com equipe':'Sem equipe';t.children[2].textContent=n?'✓':i+1;t.dataset.feito=String(n>0);t.toggleAttribute('data-aqui',aqui);});
  if(parkView)layoutParkTags(parkView.anchors());
 }
 // Lote 6.2: um rótulo nunca cobre as peças de um lugar nem outro rótulo. Em cima do lugar, embaixo, dos lados ou nos cantos, o que primeiro
@@ -105,7 +107,7 @@ const passAnim=(e,frames)=>e?.animate(frames,{duration:passMs,easing:E.chega,fil
 const canPass=()=>!motionOff()&&worldView&&!worldFailed&&parkView&&!parkFailed&&mapLayer;
 addEventListener('pointerdown',endParkPass,true);addEventListener('keydown',endParkPass,true);
 function openPark(){
- const c=parkContent();if(!c)return;const t0=performance.now();endTips();closeNote(true);finishPassage();park.open=true;park.view='parque';park.lugar=-1;park.pick=null;park.fala=null;
+ const c=parkContent();if(!c)return;const t0=performance.now();endTips();closeNote(true);finishPassage();park.open=true;park.view='parque';park.lugar=-1;park.pick=null;park.fala=null;park.foto='';
  const vp=$('world-viewport');
  if(!vp.querySelector('.park-tags')){const t=document.createElement('div');t.className='park-tags';t.setAttribute('aria-hidden','true');vp.append(t);}
  if(!parkView&&!parkFailed&&window.Parque&&!worldFailed){try{parkView=Parque.create(vp,{lugares:c.lugares,onPick:i=>openLugar(i),onFrame:layoutParkTags,onError:m=>{parkFailed=true;setWorldStatus(m);}});window.parkWorld=parkView;}catch{parkFailed=true;}}
@@ -161,26 +163,34 @@ function donePlace(){
  if(v){park.fala={prof:v.prof,texto:v.texto,vol:true};paintWorld();mundoSay(`${proName(c,v.prof)}: ${v.texto}`);$('mundo-fields').querySelector('[data-vol=sim]')?.focus({preventScroll:true});showFala();return;}
  leavePlace(c,mundosNow());
 }
+// Lote 6.3: ao terminar um lugar, a equipe entra na coleção e só depois de gravar o card do lugar aparece. Sem gravar, não há card.
 function leavePlace(c,p){
- const m=Mundos.doMundo(p,PARK_ID),l=c.lugares[park.lugar];park.view=Mundos.parqueCompleto(c,m)?'fechamento':'parque';const from=park.lugar;park.lugar=-1;park.fala=null;park.pick=null;status('mundo-status','');paintWorld();
- mundoSay(`${l.nome} com equipe. ${c.lugares.filter(x=>Mundos.lugarFeito(m,x.id)).length} de ${c.lugares.length} lugares.`);
- if(park.view!=='parque'||!focusLugar(from))focusMundo();
+ const l=c.lugares[park.lugar],r=Mundos.colecionar(p,PARK_ID,l.id),m=Mundos.doMundo(r.p,PARK_ID),ok=saveMundos(r.p);park.fala=null;park.pick=null;park.desc=null;park.novas=r.novas;
+ const dito=`${l.nome} com equipe. ${c.lugares.filter(x=>Mundos.lugarFeito(m,x.id)).length} de ${c.lugares.length} lugares.`;
+ if(ok){park.view='equipe';status('mundo-status','');paintWorld();mundoSay(dito+(r.novas.length?` Carta nova: ${r.novas.map(x=>proName(c,x)).join(', ')}.`:''));focusMundo();Cel.entrar($('mundo-fields'),60);return;}
+ park.view=Mundos.parqueCompleto(c,m)?'fechamento':'parque';const from=park.lugar;park.lugar=-1;paintWorld();status('mundo-status','Não deu para guardar neste navegador. A equipe fica nesta tela enquanto ela estiver aberta.',true);
+ mundoSay(dito);if(park.view!=='parque'||!focusLugar(from))focusMundo();
 }
+// O que a criança escreve é gravado ao sair do campo, com Enter ou em "Guardar"; Esc fecha sem gravar.
+function saveDesc(i){const c=parkContent(),l=c.lugares[park.lugar],p=mundosNow();p.mundos={...p.mundos,[PARK_ID]:Mundos.descrever(Mundos.doMundo(p,PARK_ID),l.id,i.dataset.desc,i.value)};
+ if(!saveMundos(p))status('mundo-status','Não deu para guardar neste navegador. O texto fica nesta tela enquanto ela estiver aberta.',true);}
+function closeDesc(){const id=park.desc;if(!id)return;park.desc=null;paintWorld();$('mundo-fields').scrollTop=park.rola;$('mundo-fields').querySelector(`[data-k="escrever-${id}"]`)?.focus({preventScroll:true});}
 // O foco volta ao lugar de onde a criança veio e o painel rola até ele (deitado, o painel tem uns 180 px e o lugar ficava fora: 1ª volta do Y).
 function focusLugar(i){const b=$('mundo-fields').querySelector(`[data-lugar="${i}"]`);if(!b)return false;b.focus({preventScroll:true});b.scrollIntoView({block:'nearest',behavior:'instant'});return true;}
-function answerClosing(a){const p=mundosNow(),m=Mundos.doMundo(p,PARK_ID);p.mundos={...p.mundos,[PARK_ID]:{...m,fechamento:a}};saveMundos(p);status('mundo-status','');paintWorld();$('mundo-fields').querySelector(`[data-fecho="${a}"]`)?.focus({preventScroll:true});mundoSay(a==='sim'?'Você respondeu sim.':'Você respondeu não.');}
+function answerClosing(a){const p=mundosNow(),m=Mundos.doMundo(p,PARK_ID);p.mundos={...p.mundos,[PARK_ID]:{...m,fechamento:a}};saveMundos(p);status('mundo-status','');paintWorld();$('mundo-fields').querySelector(`[data-fecho="${a}"]`)?.focus({preventScroll:true});mundoSay(a==='sim'?'Você respondeu sim.':'Você respondeu não.');park.foto=Cel.foto();}
 function concludeWorld(){
  const c=parkContent(),p=mundosNow(),m=Mundos.doMundo(p,PARK_ID);
  if(!['sim','nao'].includes(m.fechamento)){status('mundo-status','Responda sim ou não para concluir.',true);$('mundo-fields').querySelector('[data-fecho]')?.focus({preventScroll:true});return;}
- const first=!m.concluido;p.mundos={...p.mundos,[PARK_ID]:{...m,concluido:true}};p.atual=1;
+ // Lote 6.3: cards depois da passagem, na primeira conclusão; a foto foi lida ao responder sim ou não.
+ const first=!m.concluido,img=first?park.foto||Cel.foto():'',after=first?()=>Cel.mundo(0,img):null;p.mundos={...p.mundos,[PARK_ID]:{...m,concluido:true}};p.atual=1;
  // A conclusão só vale gravada: com a gravação recusada, a memória da tela volta ao que era (equipes e resposta ficam; mundo atual e
  // concluído, não), senão a trilha passava ao mundo 2 sem nada guardado (1ª volta do Y, mapa-clique).
  const mem=mundosMem;
  if(!saveMundos(p)){mundosMem=mem;status('mundo-status','Não deu para guardar neste navegador. Tente de novo.',true);return;}
  closePark(true);paintWorld();
- if(!worldView||worldFailed){$('world-live').textContent='Mundo 1 de 7 concluído.';focusMundo();return;}
+ if(!worldView||worldFailed){$('world-live').textContent='Mundo 1 de 7 concluído.';focusMundo();after?.();return;}
  worldView.setActive(true);if(!first)cheered.add(0);// a comemoração vem uma vez por mundo, como no 5.11
- passPhase(0,{title:'Mundo 1 de 7 concluído',done:`${c.lugares.length} lugares com equipe`,guard:400});
+ passPhase(0,{title:'Mundo 1 de 7 concluído',done:`${c.lugares.length} lugares com equipe`,guard:400,after});
 }
 // Arrastar: o profissional segue o dedo ou o ponteiro numa cópia; solto sobre a equipe, entra nela. Um toque sem arrastar escolhe
 // o profissional, e o toque seguinte na equipe o põe lá. No teclado (clique sem ponteiro), Enter põe direto.
@@ -204,11 +214,13 @@ $('world-stage').addEventListener('click',e=>{
  if(!bosqueOn())return;
  if(eatClick){eatClick=false;return;}
  // QA M1, B1 e B2: o segundo clique de um toque duplo (detail > 1) não repete a ação nem cai no botão que apareceu embaixo.
- if(e.detail>1&&e.target.closest('[data-park],[data-vol],[data-lugar],[data-park-lugar],[data-fecho],[data-por],[data-tirar]'))return;
+ if(e.detail>1&&e.target.closest('[data-park],[data-vol],[data-lugar],[data-park-lugar],[data-fecho],[data-por],[data-tirar],[data-escrever]'))return;
  const t=e.target;
  if(t.closest('.park-tag')){openLugar(Number(t.closest('.park-tag').dataset.i));return;}
  if(t.closest('[data-park-lugar]')){openLugar(Number(t.closest('[data-park-lugar]').dataset.parkLugar));return;}
  const a=t.closest('[data-park]')?.dataset.park;
+ if(a==='lugar'){openLugar(park.lugar);return;}if(a==='guardar'){closeDesc();return;}
+ const escrever=t.closest('[data-escrever]');if(escrever){park.desc||(park.rola=$('mundo-fields').scrollTop);park.desc=escrever.dataset.escrever;paintWorld();const i=$('cel-desc');i?.focus({preventScroll:true});i?.parentNode.scrollIntoView({block:'nearest',behavior:'instant'});return;}// o bloco inteiro: campo e Guardar à vista
  if(a==='abrir'){openPark();return;}if(a==='mundo1'){goStop(0);return;}if(a==='trilha'){closePark();focusMundo();return;}if(a==='parque'){park.view='parque';const was=park.lugar;park.lugar=-1;park.fala=null;park.pick=null;status('mundo-status','');paintWorld();if(!focusLugar(was))focusMundo();return;}
  if(a==='pronto'){donePlace();return;}if(a==='fechar'){park.view='fechamento';paintWorld();focusMundo();return;}if(a==='concluir'){concludeWorld();return;}
  if(t.closest('[data-lugar]')){openLugar(Number(t.closest('[data-lugar]').dataset.lugar));return;}
@@ -221,7 +233,9 @@ $('world-stage').addEventListener('click',e=>{
  if(t.closest('[data-por]')||park.pick&&t.closest('[data-drop]')){if(park.pick)addPro(park.pick);return;}
 });
 // A fila do parque responde ao teclado como a das paradas (botões); Esc dentro de um lugar volta ao parque.
-addEventListener('keydown',e=>{if(e.key!=='Escape'||!park.open||!bosqueOn()||note)return;if(park.pick){park.pick=null;paintWorld();return;}if(park.view!=='parque'){$('mundo-actions').querySelector('[data-park=parque]')?.click();}});
+$('world-stage').addEventListener('change',e=>{if(e.target.dataset?.desc===park.desc)saveDesc(e.target);});// Esc fecha sem gravar
+$('world-stage').addEventListener('keydown',e=>{if(e.key==='Enter'&&e.target.matches?.('[data-desc]')){e.preventDefault();saveDesc(e.target);closeDesc();}});
+addEventListener('keydown',e=>{if(e.key!=='Escape'||!park.open||!bosqueOn()||note)return;if(park.desc){closeDesc();return;}if(park.pick){park.pick=null;paintWorld();return;}if(park.view!=='parque'){$('mundo-actions').querySelector('[data-park=parque]')?.click();}});
 {const q=$('world-question'),f=document.createElement('div');f.id='mundo-fields';f.className='mundo-fields';q.append(f);
  const s=document.createElement('p');s.id='mundo-status';s.className='status mundo-status';s.setAttribute('role','status');s.setAttribute('aria-live','polite');q.append(s);
  const a=document.createElement('div');a.id='mundo-actions';a.className='mundo-actions';q.append(a);

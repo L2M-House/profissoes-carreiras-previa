@@ -48,6 +48,38 @@ const Mundos=(()=>{
  // O prioritário que falta e ainda não se ofereceu neste lugar (ele se oferece uma vez).
  function voluntario(c,m,lugar){const l=c.lugares.find(x=>x.id===lugar);if(!l?.prioritario||equipe(m,lugar).includes(l.prioritario)||(m.ofertas||[]).includes(lugar))return null;return {prof:l.prioritario,texto:l.voluntario};}
  const sintese=(c,m)=>c.lugares.map(l=>({lugar:l.nome,atividade:l.atividade,equipe:equipe(m,l.id).map(id=>c.profissionais.find(p=>p.id===id)?.nome||id)}));
- return Object.freeze({ETAPA,LISTA,conteudo,decode,pessoa,gravar,doMundo,equipe,lugarFeito,parqueCompleto,mundoFeito,feito,aberto,incluir,retirar,fala,voluntario,sintese});
+ // Lote 6.3: coleção, descrições, panorama e acessório, aditivos em pc-mundos-v1 (versão 1). Na pessoa: colecao:{profissional:{mundo:
+ // [lugares]}}, lembrar:[profissionais] e acessorio; no mundo: descricoes:{lugar:{profissional:texto}}. Só IDs e o texto dela, sem data
+ // nem ponto. A coleção só cresce: tirar alguém da equipe não tira a carta.
+ const ACESSORIOS=Object.freeze({chapeu:'Chapéu',mochila:'Mochila',lenco:'Lenço'});
+ // Ao terminar um lugar, a equipe entra na coleção. Devolve a pessoa e as cartas novas.
+ function colecionar(p,id,lugar){
+  const col={...p.colecao},t=equipe(doMundo(p,id),lugar),novas=t.filter(x=>!col[x]);
+  for(const x of t){const ls=col[x]?.[id]||[];if(!ls.includes(lugar))col[x]={...col[x],[id]:[...ls,lugar]};}
+  return {p:{...p,colecao:col},novas};
+ }
+ const descricao=(m,lugar,prof)=>String(m.descricoes?.[lugar]?.[prof]??'').trim();
+ const descrever=(m,lugar,prof,texto)=>({...m,descricoes:{...m.descricoes,[lugar]:{...m.descricoes?.[lugar],[prof]:String(texto).trim().slice(0,140)}}});
+ const lembrar=(p,prof)=>{const l=p.lembrar||[];return {...p,lembrar:l.includes(prof)?l.filter(x=>x!==prof):[...l,prof]};};
+ // O que a criança fez no mundo, contado. Nenhum número é nota.
+ const fatos=(c,m)=>({lugares:c.lugares.filter(l=>lugarFeito(m,l.id)).length,profissionais:c.lugares.reduce((n,l)=>n+equipe(m,l.id).length,0),
+  descricoes:c.lugares.reduce((n,l)=>n+equipe(m,l.id).filter(x=>descricao(m,l.id,x)).length,0)});
+ // Uma carta por profissional: onde a criança o pôs, a fala que a Dra. escreveu (ou null: lacuna), o que ela escreveu e onde ele se ofereceu.
+ function cartas(p,todos=globalThis.MUNDOS||{}){
+  return Object.entries(p.colecao||{}).flatMap(([prof,onde])=>{
+   const k={id:prof,nome:prof,mundo:Object.keys(onde)[0],lugares:[],fala:null,escritas:[],ofereceu:[],lembrar:(p.lembrar||[]).includes(prof)};
+   for(const [id,ls] of Object.entries(onde)){const c=todos[id];if(!c)continue;const m=doMundo(p,id);k.nome=c.profissionais.find(x=>x.id===prof)?.nome||k.nome;
+    for(const l of c.lugares.filter(l=>ls.includes(l.id))){k.lugares.push(l.nome);k.fala??=l.equipe?.[prof]?.fala||null;const d=descricao(m,l.id,prof);if(d)k.escritas.push({lugar:l.nome,texto:d});
+     if(l.prioritario===prof&&(m.ofertas||[]).includes(l.id))k.ofereceu.push(l.nome);}}
+   return k.lugares.length?[k]:[];});
+ }
+ // Panorama: uma linha por mundo concluído. "concluido" não volta atrás, então ele só cresce.
+ function panorama(p,todos=globalThis.MUNDOS||{}){
+  return LISTA.flatMap((L,i)=>{const c=conteudo(i,todos),m=c&&doMundo(p,L.conteudo);if(!m?.concluido)return [];
+   return [{n:i+1,nome:c.titulo,lugares:sintese(c,m).filter(s=>s.equipe.length),pergunta:c.fechamento,resposta:{sim:'Sim',nao:'Não'}[m.fechamento]||null,
+    escritas:c.lugares.flatMap(l=>equipe(m,l.id).map(x=>({lugar:l.nome,prof:c.profissionais.find(q=>q.id===x)?.nome||x,texto:descricao(m,l.id,x)})).filter(d=>d.texto))}];});
+ }
+ return Object.freeze({ETAPA,LISTA,conteudo,decode,pessoa,gravar,doMundo,equipe,lugarFeito,parqueCompleto,mundoFeito,feito,aberto,incluir,retirar,fala,voluntario,sintese,
+  ACESSORIOS,colecionar,descricao,descrever,lembrar,fatos,cartas,panorama});
 })();
 if(typeof module!=='undefined')module.exports=Mundos;

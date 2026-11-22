@@ -112,7 +112,7 @@ function pose(fig,key){
  for(const [sel,v] of Object.entries(p.parts)){if(sel==='.marca-velocidade'||sel==='.marca-poeira')continue;const m=fig.querySelector(sel+'>.mov');if(m){m.style.transform=T(v);if(sel.startsWith('.marca'))m.style.opacity=1;}}
 }
 function stopMapMotion(){
- endParkPass();parkView?.setMotion(!motionOff());finishPassage();endCheer();for(const key of [...mapRuns.keys()])stopRuns(key);mapTimers.forEach(clearTimeout);mapTimers.clear();
+ endParkPass();parkView?.setMotion(!motionOff());finishPassage();endCheer();Cel.settle();for(const key of [...mapRuns.keys()])stopRuns(key);mapTimers.forEach(clearTimeout);mapTimers.clear();
  mapLayer?.querySelectorAll('.map-fx').forEach(e=>e.remove());mapLayer?.querySelectorAll('.companion').forEach(f=>pose(f,'repouso'));
 }
 // Efeito preso a uma parada (índice) ou ao Rumo; sai do DOM quando acaba ou é cancelado.
@@ -205,7 +205,7 @@ function goStop(i,from=null){
 // worldFailed keeps the message so a click on a stop does not erase why the map is a picture.
 function worldFallback(message){worldFailed=message;worldView?.setActive(false);$('world-viewport').dataset.fallback='true';setWorldStatus(message);$('world-camera').hidden=true;maybeTips();}
 function syncWorld(){
- const visible=current==='trilha'&&programa==='filho';$('bosque').hidden=!visible;if(!visible)closePark(true);
+ const visible=current==='trilha'&&programa==='filho';$('bosque').hidden=!visible;if(!visible){closePark(true);Cel.fechar();}
  const off=motionOff();if(!visible||off&&!mapWasOff)stopMapMotion();mapWasOff=off;
  if(!visible){closeMap(true);worldView?.setActive(false);if(tipStep>=0){tipStep=-1;closeNote(true);}else closeNote();if(guide.matches(':popover-open'))guide.hidePopover();return;}
  paintWorld();
@@ -246,14 +246,15 @@ function paintWorldCamera(state){
 // e o aviso diz "Fase 2 de 7 concluída" e quantos passos ela respondeu; tudo volta em 2,4 s. Movimento reduzido ou pausa trocam a
 // comemoração, sem apagá-la: o mesmo aviso num fade curto, o Rumo e o guia em pose parada, sem confete, mapa crescendo ou caminhada.
 // Lote 6.1: a mesma passagem fecha um mundo ("Mundo 1 de 7 concluído", com os lugares que ganharam equipe).
-function passPhase(from,{title,done,guard=0}){
+// Lote 6.3: "after" roda quando a passagem acaba, por qualquer caminho: é onde entram os cards do mundo.
+function passPhase(from,{title,done,guard=0,after=null}){
  const to=from+1;closeMap(true);endTips();closeNote(true);
  const vp=$('world-viewport');let note=vp.querySelector('.passage-note');if(!note){note=document.createElement('p');note.className='passage-note';note.setAttribute('aria-hidden','true');vp.append(note);}
  note.innerHTML=`<b>${title}</b><small>${done}</small>`;$('world-live').textContent=`${title}. ${done}.`;
- if(motionOff()||!worldView||worldFailed||!mapLayer){passage={from,to};worldView?.select(to,{instant:true});passage=null;if(!worldView||worldFailed||!mapLayer)quietCheer(from);return;}
+ if(motionOff()||!worldView||worldFailed||!mapLayer){passage={from,to};worldView?.select(to,{instant:true});passage=null;if(!worldView||worldFailed||!mapLayer)quietCheer(from);after?.();return;}
  stopCompanionMotion();// a entrada da pergunta nova não roda por trás do mapa
  // QA B1: o confete e o Rumo comemorando vêm uma vez por fase concluída; voltar e terminar a fase de novo só faz a passagem.
- passage={from,to,timers:[],first:!cheered.has(from),until:performance.now()+guard,...growMap(FX.abre)};cheered.add(from);if(mapAnchors)layoutTags(mapAnchors);
+ passage={from,to,after,timers:[],first:!cheered.has(from),until:performance.now()+guard,...growMap(FX.abre)};cheered.add(from);if(mapAnchors)layoutTags(mapAnchors);
  // Lote 5.8: no desktop o quadro da caminhada guarda o guia da terra concluída, para ele aparecer comemorando.
  // Lote 5.9: a passagem acorda a parada nova (pássaros, fogueira em Agir, flores ao sair da Clareira).
  passage.timers.push(setTimeout(()=>worldView.select(to,{keep:STEP_COMPANIONS[from],passage:from}),FX.anda),setTimeout(closePassage,FX.passagem-FX.fecha));
@@ -312,7 +313,7 @@ function closePassage(){
  const back=p.el.animate(p.back,{duration:FX.fecha,easing:E.chega,fill:'forwards'});p.anims.push(back);
  back.finished.then(()=>{if(passage===p)endPassage();},()=>{});
 }
-function endPassage(){const p=passage;if(!p)return;passage=null;p.timers?.forEach(clearTimeout);p.anims?.forEach(a=>a.cancel());const st=$('world-stage');delete st.dataset.passage;delete st.dataset.closing;if(mapAnchors)layoutTags(mapAnchors);}
+function endPassage(){const p=passage;if(!p)return;passage=null;p.timers?.forEach(clearTimeout);p.anims?.forEach(a=>a.cancel());const st=$('world-stage');delete st.dataset.passage;delete st.dataset.closing;if(mapAnchors)layoutTags(mapAnchors);p.after?.();}
 // Pular: o Rumo fica na parada nova, o guia volta ao repouso, o confete sai e o painel aparece sem transição.
 function finishPassage(){
  const p=passage;if(!p?.el)return;const st=$('world-stage');
@@ -327,9 +328,11 @@ addEventListener('pointerdown',e=>{if(!e.target.closest?.('#world-camera,#world-
 // QA B6: tocar numa parada da fila durante a passagem abre essa parada (a fila muda de lugar quando o mapa encolhe).
 // QA M2 (6.1): nos primeiros 400 ms da passagem de um mundo, o segundo toque de um toque duplo não a pula.
 const passageGuard=()=>passage?.until>performance.now();
-addEventListener('pointerdown',e=>{if(!passage?.el||passageGuard())return;const s=e.target.closest?.('[data-world-stop]');finishPassage();if(s)goStop(Number(s.dataset.worldStop),s);},true);
+// 6.3: só tocar noutro mundo aberto é navegação e dispensa os cards; o de chegada ou um fechado só pulam a passagem (o toque caía na fila sem querer)
+addEventListener('pointerdown',e=>{if(!passage?.el||passageGuard())return;const s=e.target.closest?.('[data-world-stop]'),i=s?+s.dataset.worldStop:-1,vai=i>=0&&i!==passage.to&&mundosDomain().steps[i]?.available,cards=passage.after&&!vai;
+ if(vai)passage.after=null;finishPassage();if(s&&!cards)goStop(i,s);},true);
 // QA M2: a tecla que pula a passagem não rola a página (o foco está no título da fase nova).
-addEventListener('keydown',e=>{if(!passage?.el||passageGuard())return;finishPassage();if([' ','Enter','ArrowDown','ArrowUp','PageDown','PageUp','Home','End'].includes(e.key))e.preventDefault();},true);
+addEventListener('keydown',e=>{if(!passage?.el||passageGuard())return;finishPassage();if([' ','Enter','Escape','ArrowDown','ArrowUp','PageDown','PageUp','Home','End'].includes(e.key))e.preventDefault();},true);// Lote 6.3: Esc entra na lista para não fechar os cards que abrem no mesmo toque
 $('world-nodes').onclick=e=>{const name=e.target.closest('[data-name-of]'),button=name?name.previousSibling:e.target.closest('[data-world-stop]');if(button)goStop(Number(button.dataset.worldStop),button);};
 $('world-overview').onclick=()=>{if(!worldView)return;if(mapOpen&&worldView.state().overview){closeMap();return;}openMap();worldView.camera(worldView.state().overview?'focus':'center',{animate:true});};// Lote 5.8: no desktop, com zoom em movimento
 $('world-explore').onclick=()=>{if(!worldView)return;if(mapOpen&&worldView.state().exploring){closeMap();return;}openMap();worldView.setExplore(!worldView.state().exploring);};
@@ -339,7 +342,9 @@ const topBar=document.querySelector('.top');
 function measureTop(){const h=getComputedStyle(topBar).position==='sticky'?topBar.offsetHeight:0;document.documentElement.style.setProperty('--top-h',h+'px');return h;}
 measureTop();addEventListener('resize',measureTop);
 // Ao entrar na rota a página para no bloco. offsetTop ignora o transform da entrada da página, que deslocaria o bloco 10 px.
-window.scrollToWorld=()=>{let y=0;for(let e=$('world-stage');e;e=e.offsetParent)y+=e.offsetTop;window.scrollTo({top:y-measureTop(),behavior:'instant'});};
+// Lote 6.3: a Nunito chegando depois encolhe o que fica acima do bloco. Quando ela chega, mede de novo, se a página segue onde foi deixada.
+const worldY=()=>{let y=0;for(let e=$('world-stage');e;e=e.offsetParent)y+=e.offsetTop;return y-measureTop();},parkPage=top=>window.scrollTo({top,behavior:'instant'});
+window.scrollToWorld=()=>{const a=worldY();parkPage(a);if(document.fonts.status!=='loaded')document.fonts.ready.then(()=>{const b=worldY();if(!$('bosque').hidden&&scrollY>=Math.min(a,b)-1&&scrollY<=Math.max(a,b)+1)parkPage(b);});};
 reduce.addEventListener('change',syncWorld);
 new MutationObserver(syncWorld).observe(document.body,{attributes:true,attributeFilter:['data-motion','data-view']});
 

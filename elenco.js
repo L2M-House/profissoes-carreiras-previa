@@ -26,6 +26,13 @@ const MARCA={
  enfase:([x,y],a=0)=>junta('marca marca-enfase',[x,y],`<g transform="rotate(${a} ${x} ${y})">${tracoC(`M${x+8} ${y-9}l9 -8M${x+12} ${y}h12M${x+8} ${y+9}l9 8`,4)}</g>`)
 };
 
+// Lote 6.3: acessórios neutros do Rumo, escondidos no desenho; aparecem pelo data-acc (CSS). A mochila fica atrás da bola e as alças, na frente.
+const ACESSORIO={
+ mochila:`<g class="acc acc-mochila"><rect x="16" y="88" width="68" height="84" rx="20" fill="${TINTA}"/><rect x="22" y="112" width="26" height="30" rx="8" fill="${FOLHA}"/></g>`,
+ alcas:`<g class="acc acc-mochila">${traco('M66 86Q54 122 64 160',9,TINTA)}${traco('M176 88Q188 122 178 158',9,TINTA)}</g>`,
+ chapeu:`<g class="acc acc-chapeu" transform="rotate(-30 76 70)"><ellipse cx="76" cy="74" rx="40" ry="11" fill="${SOL_FUNDO}"/><path d="M50 72Q52 34 76 34Q100 34 102 72Z" fill="${SOL}"/><path d="M52 62Q76 70 100 62" fill="none" stroke="${TINTA}" stroke-width="7"/></g>`,
+ lenco:`<path class="acc acc-lenco" d="M62 180Q120 202 178 180L120 242Z" fill="${FOLHA}" stroke="${TINTA}" stroke-width="6" stroke-linejoin="round"/>`
+};
 // Rumo: a bússola. Corpo coral, rosto branco com a agulha, pés sol (o mesmo do vídeo de comemoração).
 // Os braços nascem atrás da bola, como no vídeo: só antebraço e mão aparecem fora do contorno.
 function rumoSVG(vista='34'){
@@ -40,13 +47,13 @@ function rumoSVG(vista='34'){
  +`<g class="bob" style="transform-origin:120px 234px"><g class="mov">`
  +braco('arm-l',[62,150],[36,174])+braco('arm-r',[180,150],[206,174])
  +junta('foot-r',pes[1],pe(pes[1]))+junta('foot-l',pes[0],pe(pes[0]))
- +volume(120,134,78,78,CORAL,CORAL_FUNDO,12)
+ +ACESSORIO.mochila+volume(120,134,78,78,CORAL,CORAL_FUNDO,12)+ACESSORIO.alcas
  +`<g class="face" transform="${rosto}"><circle cx="120" cy="142" r="50" fill="${BRANCO}"/>`
  +`<ellipse cx="89" cy="158" rx="10" ry="6" fill="${BLUSH}"/><ellipse cx="151" cy="158" rx="10" ry="6" fill="${BLUSH}"/>`
  +junta('eyes',[120,138],olho(103,139,8.5,11.5)+olho(141,139,8.5,11.5))
  +`<path class="mouth" d="M104 157Q121 172 138 157" fill="none" stroke="${TINTA}" stroke-width="6" stroke-linecap="round"/>`
  +junta('needle',[120,100],`<polygon points="120,32 133,100 107,100" fill="${SOL}"/><polygon points="120,32 107,100 120,100" fill="${SOL_FUNDO}"/><polygon points="109,100 131,100 120,130" fill="${TINTA}"/><polygon points="120,100 109,100 120,130" fill="${TINTA_FUNDO}"/><circle cx="120" cy="100" r="10" fill="${BRANCO}" stroke="${TINTA}" stroke-width="4.5"/>`)
- +`</g>`
+ +`</g>`+ACESSORIO.chapeu+ACESSORIO.lenco
  +`<g class="marcas">${MARCA.exclama([206,44])}${MARCA.pergunta([206,44])}${MARCA.velocidade([2,150])}${MARCA.poeira([70,232])}</g>`
  +`</g></g>`;
 }
