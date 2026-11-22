@@ -7,7 +7,9 @@ const LOCK='<svg viewBox="0 0 16 16" width="14" height="14" aria-hidden="true"><
 // estado dele e o rascunho. Lote 5.11: feita é a fase com todos os passos respondidos (ou o exercício guardado); começada, a que
 // tem alguma resposta e ainda falta passo; aberta, a que ainda não tem nenhuma. "Deixada para depois" só vem de rascunho ou
 // registro de antes do 5.11: na rota do Filho não há mais "Responder depois".
-const LOOK_TEXT={aqui:'Você está aqui',feita:'Feita',comecada:'Começada',fechada:'Fechada',aberta:'Aberta',preparo:'Em preparação'};
+// Lote R1a: os estados concordam com "mundo" (Feito, Começado, Fechado, Aberto); eram do tempo das fases. O mundo sem conteúdo diz "Em obras", a
+// mesma palavra do canteiro da trilha, do cartão e do lugar (era "Em preparação"; decisão da origem, 22/11).
+const LOOK_TEXT={aqui:'Você está aqui',feita:'Feito',comecada:'Começado',fechada:'Fechado',aberta:'Aberto',preparo:'Em obras'};
 const LOOK_GLYPH={feita:'✓',comecada:'✎',preparo:'…'};
 // Lote 6.1: a trilha do Filho é a etapa de exploração do Pelletier, e cada parada é um mundo (uma subtarefa). As perguntas escritas
 // saíram da rota do Filho e continuam no laboratório (#experimento). O que a pessoa faz nos mundos fica em pc-mundos-v1, chave nova;
@@ -182,7 +184,7 @@ function paintWorld(){
  if(list.children.length!==STOPS.length)list.innerHTML=STOPS.map((s,i)=>`<li><button type="button" class="world-node land-${s.mark.land}" data-world-stop="${i}"></button><span class="node-name" data-name-of="${i}" aria-hidden="true"><b>${worldName(i)}</b><small></small></span></li>`).join('');
  d.steps.forEach((s,i)=>{const b=list.children[i].firstChild,look=s.look,glyph=look==='fechada'?LOCK:LOOK_GLYPH[look]||String(i+1),prev=b.dataset.state;
   b.dataset.state=s.state;b.dataset.look=look;b.toggleAttribute('aria-current',i===focus);if(i===focus)b.setAttribute('aria-current','step');
-  b.setAttribute('aria-label',`Mundo ${i+1} de 7, ${worldName(i)}: ${LOOK_TEXT[look]}${look==='aqui'&&s.prep?', em preparação':''}`);b.title=`Mundo ${i+1} de 7 · ${worldName(i)} · ${LOOK_TEXT[look]}`;
+  b.setAttribute('aria-label',`Mundo ${i+1} de 7, ${worldName(i)}: ${LOOK_TEXT[look]}${look==='aqui'&&s.prep?', em obras':''}`);b.title=`Mundo ${i+1} de 7 · ${worldName(i)} · ${LOOK_TEXT[look]}`;
   const key=look==='fechada'?'lock':glyph;if(b.dataset.glyph!==key){b.innerHTML=`<span class="node-glyph">${glyph}</span>`;b.dataset.glyph=key;}
   const name=list.children[i].lastChild;name.dataset.look=look;name.lastChild.textContent=LOOK_TEXT[look];
   if(prev!==s.state)nodeEffects(b,i,prev,s.state);});
@@ -203,22 +205,21 @@ function goStop(i,from=null){
  const p=d.p;p.atual=i;saveMundos(p);paintWorld();worldView?.select(i);focusMundo();
 }
 // worldFailed keeps the message so a click on a stop does not erase why the map is a picture.
-function worldFallback(message){worldFailed=message;worldView?.setActive(false);$('world-viewport').dataset.fallback='true';setWorldStatus(message);$('world-camera').hidden=true;maybeTips();}
+function worldFallback(message){worldFailed=message;worldView?.setActive(false);$('world-viewport').dataset.fallback='true';setWorldStatus(message);$('world-camera').hidden=true;}
 function syncWorld(){
  const visible=current==='trilha'&&programa==='filho';$('bosque').hidden=!visible;if(!visible){closePark(true);Cel.fechar();}
  const off=motionOff();if(!visible||off&&!mapWasOff)stopMapMotion();mapWasOff=off;
  if(!visible){closeMap(true);worldView?.setActive(false);if(tipStep>=0){tipStep=-1;closeNote(true);}else closeNote();if(guide.matches(':popover-open'))guide.hidePopover();return;}
  paintWorld();
- if(worldFailed){maybeTips();return;}
+ if(worldFailed)return;
  if(!worldView){
   if(worldLoading)return;worldLoading=true;
   const script=document.createElement('script');script.src='media/world/bosque.bundle.js?v=20';
   script.onerror=()=>worldFallback('Não foi possível abrir o 3D. As paradas e as perguntas continuam disponíveis.');
-  script.onload=()=>{try{buildMapLayer();worldView=Bosque.create($('world-viewport'),{onSelect:goStop,onError:worldFallback,onView:paintWorldCamera,onFrame:layoutMap,onWalk:onRumoWalk});window.mapWorld=worldView;measureInsets();$('world-viewport').dataset.ready='true';paintWorld();mapQuiet=true;worldView.select(mundosDomain().atual,{instant:true});mapQuiet=false;syncWorld();worldView.intro();maybeTips();}catch{worldFallback('Seu navegador não abriu o 3D. Use a lista de paradas.');}};
+  script.onload=()=>{try{buildMapLayer();worldView=Bosque.create($('world-viewport'),{onSelect:goStop,onError:worldFallback,onView:paintWorldCamera,onFrame:layoutMap,onWalk:onRumoWalk});window.mapWorld=worldView;measureInsets();$('world-viewport').dataset.ready='true';paintWorld();mapQuiet=true;worldView.select(mundosDomain().atual,{instant:true});mapQuiet=false;syncWorld();worldView.intro();}catch{worldFallback('Seu navegador não abriu o 3D. Use a lista de paradas.');}};
   document.head.append(script);return;
  }
  worldView.setActive(!park.open);worldView.setMotion(!motionOff());measureInsets();// Lote 6.1: com o parque aberto o bosque não desenha por trás
- maybeTips();
 }
 window.refreshWorld=syncWorld;
 // Lote 5.6: os botões da câmera ficam sobre a base do mapa; a câmera enquadra paradas e personagens acima deles.
@@ -360,7 +361,7 @@ function markSeen(...keys){keys.forEach(k=>seenNow[k]=true);const v=read(SEEN_KE
 const ROLE={rumo:'eu ando com você pela trilha, de um mundo para o outro.',bino:'eu fico no trecho dos mundos 1 e 2.',
  pipa:'eu fico no trecho dos mundos 3 e 4.',teo:'eu fico no trecho dos mundos 6 e 7.'};
 // A legenda mostra os estados que a rota do Filho produz (Lote 5.11: sem "Deixada para depois").
-const LOOK_HELP={aqui:'O mundo onde você está agora.',feita:'Mundo terminado: todos os lugares têm equipe e o fechamento foi respondido.',comecada:'Já tem equipe em algum lugar, mas ainda falta terminar.',fechada:'Abre quando você terminar o mundo anterior.',aberta:'Ainda sem nada. O número é a ordem do mundo.',preparo:'O exercício deste mundo ainda vai chegar.'};
+const LOOK_HELP={aqui:'O mundo onde você está agora.',feita:'Mundo terminado: você montou as equipes e respondeu à pergunta do fim.',comecada:'Já tem equipe em algum lugar, mas ainda falta terminar.',fechada:'Abre quando você terminar o mundo anterior.',aberta:'Ainda sem nada. O número é a ordem do mundo.',preparo:'Este mundo está em obras.'};
 const tip=document.createElement('div');tip.id='world-tip';tip.className='world-tip';tip.popover='manual';tip.setAttribute('role','dialog');tip.setAttribute('aria-labelledby','world-tip-text');
 tip.innerHTML='<span class="tip-face" aria-hidden="true"></span><div class="tip-body"><p id="world-tip-text" class="tip-text"></p><div class="tip-foot"><span class="tip-count"></span><button type="button" class="tip-ok">Entendi</button></div></div>';
 $('bosque').append(tip);
@@ -386,25 +387,16 @@ function placeNote(){
  tip.style.left=left+'px';tip.style.top=top+'px';tip.dataset.side=side;tip.style.setProperty('--tail',Math.max(22,Math.min(b.width-22,ax-left))+'px');
 }
 addEventListener('resize',placeNote);addEventListener('scroll',placeNote,{passive:true,capture:true});
-// As três dicas: o bosque (pelo Rumo), as fases com a atual e o topo da pergunta, que também explica a etapa.
-const centerX=e=>()=>{const r=rectOf(e());return r.left+r.width/2;};
-const rumoEl=()=>figureOf('rumo')||$('world-viewport'),nodeEl=()=>$('world-nodes').querySelector('[aria-current]')||$('world-nodes'),stageEl=()=>$('world-place-stage');
-function tipList(){
- const list=[
-  // QA M3 (17/10): no mapa curto do celular em pé, a dica 1 fica abaixo do cartão do mapa, e o bosque e a fila ficam à vista.
-  // QA M5: só "fase" para cada parada da trilha na rota do Filho.
-  {html:'Este é o bosque. Eu sou o Rumo e ando com você pela trilha, de um mundo para o outro.',target:()=>shortStrip()?rectOf($('world-viewport').parentElement):rectOf(rumoEl()),x:centerX(rumoEl),prefer:['below','above']},
-  {html:'Estes são os 7 mundos da exploração. Você está neste.',target:()=>rectOf(nodeEl()),x:centerX(nodeEl),prefer:['above','below']},
-  {html:'Exploração é a etapa 1 de 4. Cada mundo é um exercício, e aqui embaixo você entra nele.',target:()=>rectOf(stageEl()),x:centerX(stageEl),prefer:['below','above']}];
- return list;
-}
-let tipAt=0;// QA M2 (17/10): o balão muda de lugar ao passar a dica, e o segundo toque de um toque duplo caía fora dele
-function showTip(i){const list=tipList();tipStep=i;tipAt=performance.now();openNote({kind:'dica',face:'rumo',ok:true,count:`Dica ${i+1} de ${list.length}`,...list[i]});}
-function nextTip(){if(tipStep<0)return;if(tipStep+1<tipList().length)showTip(tipStep+1);else endTips();}
+// Lote R1a (decisão 5 do plano): das três dicas da primeira visita ficou uma, sobre o gesto de montar a equipe, na primeira vez que a
+// criança abre um lugar (openLugar, parque.js). As do bosque, da fila e da etapa saíram: o cartão curto do mundo já diz o que fazer.
+// Ela aponta para a equipe; se a equipe estiver fora da área do painel (deitado), para os profissionais. Fica vista na mesma chave
+// de antes ("dicas", em pc-dicas-v1): quem já viu as dicas não a vê de novo, e a legenda traz o mesmo texto.
+const TIP_GESTO='Arraste um profissional até a sua equipe. Ou toque nele e depois na equipe.';
+const gestoEl=()=>{const f=$('mundo-fields'),z=f.querySelector('[data-drop]'),a=rectOf(f),b=rectOf(z);return b&&b.top>=a.top-1&&b.bottom<=a.bottom+1?z:f.querySelector('.mundo-pros')||f;};
+let tipAt=0;// QA M2 (17/10): o segundo toque de um toque duplo não age no que ficou embaixo do balão
+function showTip(){tipStep=0;tipAt=performance.now();openNote({kind:'dica',face:'rumo',ok:true,html:TIP_GESTO,target:()=>rectOf(gestoEl()),prefer:['below','above']});}
 function endTips(){if(tipStep<0)return;tipStep=-1;closeNote(true);markSeen('dicas');}
-// Depois da câmera de entrada (5.8), que já mostra o bosque inteiro: as dicas esperam a câmera e o Rumo pararem.
-function whenStill(fn,t0=performance.now()){const s=worldView?.state();if(s&&(s.intro||s.cam||s.hop)&&performance.now()-t0<8000){setTimeout(()=>whenStill(fn,t0),120);return;}fn();}
-function maybeTips(){if(isSeen('dicas')||tipStep>=0||!bosqueOn()||park.open)return;setTimeout(whenStill,60,()=>{if(!isSeen('dicas')&&tipStep<0&&!note&&bosqueOn()&&!passage?.el&&!park.open)showTip(0);});}
+function maybeTip(){if(!isSeen('dicas')&&tipStep<0&&bosqueOn()&&park.open&&park.view==='lugar')showTip();}
 function roleNote(name){
  const fig=figureOf(name);if(!fig)return;
  openNote({kind:'papel',face:name,html:`<b>${ELENCO[name].name}:</b> ${ROLE[name]}`,target:()=>rectOf(fig),prefer:['above','below']});
@@ -416,13 +408,14 @@ function lockedNote(i,from){
  openNote({kind:'fechada',html:`<b>Mundo ${i+1} de 7 · ${worldName(i)}</b> Abre quando você terminar o mundo anterior.`,target,prefer:['above','below']});
 }
 // QA M2 (17/10): o segundo clique de um duplo clique (ou toque duplo) em "Entendi" não pula a dica seguinte.
-tip.querySelector('.tip-ok').onclick=e=>{if(e.detail>1)return;if(note?.kind==='dica')nextTip();else closeNote();};
+tip.querySelector('.tip-ok').onclick=e=>{if(e.detail>1)return;if(note?.kind==='dica')endTips();else closeNote();};
 const shortStrip=()=>!SIDE.matches&&$('world-viewport').getBoundingClientRect().height<200;
 // Um toque em qualquer lugar, menos no "Entendi", passa a dica ou fecha o balão. Os balões só de informação (fase fechada,
 // papel do personagem) não recebem toque: ele segue para o que está embaixo, como o "Ver a trilha toda" no mapa curto do
 // celular, que o balão da fase fechada cobria (achado da suíte rota-uma-tela, A2 em 360×660).
-addEventListener('pointerdown',e=>{if(!note||e.target.closest?.('.tip-ok'))return;if(note.kind==='dica'){if(performance.now()-tipAt>400)nextTip();}else closeNote();},true);
-addEventListener('keydown',e=>{if(e.key!=='Escape'||!note)return;if(note.kind==='dica')endTips();else closeNote();});
+addEventListener('pointerdown',e=>{if(!note||e.target.closest?.('.tip-ok'))return;if(note.kind==='dica'){if(performance.now()-tipAt>400)endTips();}else closeNote();},true);
+// Lote R1a: a dica agora abre dentro de um lugar do parque. O Esc que fecha o balão para aqui, senão o mesmo Esc também saía do lugar (parque.js).
+addEventListener('keydown',e=>{if(e.key!=='Escape'||!note)return;e.stopImmediatePropagation();if(note.kind==='dica')endTips();else closeNote();});
 // Legenda: os estados com o mesmo símbolo e o mesmo nome da fila e do mapa, as etapas e quem é quem; e as dicas de novo.
 const guide=$('world-guide');
 function paintGuide(){
@@ -430,13 +423,14 @@ function paintGuide(){
  // QA M8 (17/10): "Fechar" fica preso no topo da legenda, à vista sem rolar. QA M10: a cor de cada etapa ao lado do nome, a
  // mesma da borda das fases na fila.
  guide.innerHTML=`<div class="guide-head"><h2 id="world-guide-title">Como ler a trilha</h2><button type="button" class="back" id="guide-close">Fechar</button></div><ul class="guide-looks">${Object.keys(LOOK_HELP).map(l=>`<li>${sample(l)}<span><b>${LOOK_TEXT[l]}</b><small>${LOOK_HELP[l]}</small></span></li>`).join('')}</ul>`+
-  `<h3>A etapa de Exploração</h3><p class="guide-note">Esta trilha é a etapa 1 de 4 do método. Cada um dos 7 mundos é uma subtarefa. A borda de cada mundo na fila tem a cor do trecho do bosque.</p>`+
+  `<h3>A etapa de Exploração</h3><p class="guide-note">${CONDUZ?'Esta trilha é a etapa 1 de 4 do método. Cada um dos 7 mundos é uma subtarefa.':'São 7 mundos. Um abre depois do outro.'} A borda de cada mundo na fila tem a cor do trecho do bosque.</p>`+
   // QA M10 (17/10): a cor de cada trecho ao lado do nome, a mesma da borda dos mundos na fila.
   `<ul class="guide-stages">${[['leaf','Mundos 1 e 2'],['coral','Mundos 3 e 4'],['sun','Mundo 5'],['ink','Mundos 6 e 7']].map(([l,t])=>`<li><span class="stage-dot land-${l}" aria-hidden="true"></span><span>${t}</span></li>`).join('')}</ul>`+
   `<h3>Quem é quem</h3><ul class="guide-cast">${['rumo','bino','pipa','teo'].map(n=>`<li><span class="tip-face" aria-hidden="true">${companion(n,'welcome')}</span><span><b>${ELENCO[n].name}:</b> ${ROLE[n]}</span></li>`).join('')}</ul>`+
-  '<div class="guide-actions"><button type="button" class="btn" id="guide-tips">Ver as dicas de novo</button></div>';
+  // Lote R1a: a dica única vive dentro do lugar; aqui fica o mesmo texto, para reler.
+  `<h3>Como montar uma equipe</h3><p class="guide-note">${TIP_GESTO}</p>`;
 }
 guide.addEventListener('beforetoggle',e=>{if(e.newState!=='open')return;endTips();closeNote(true);paintGuide();});
 guide.addEventListener('toggle',e=>{if(e.newState!=='open')return;const b=rectOf($('world-guide-open')),g=guide.getBoundingClientRect(),m=8,vw=document.documentElement.clientWidth;
  guide.style.left=Math.max(m,Math.min(vw-m-g.width,b.left))+'px';guide.style.top=Math.max(m,Math.min(innerHeight-m-g.height,b.bottom+8))+'px';});
-guide.addEventListener('click',e=>{if(e.target.closest('#guide-close'))guide.hidePopover();if(e.target.closest('#guide-tips')){guide.hidePopover();showTip(0);}});
+guide.addEventListener('click',e=>{if(e.target.closest('#guide-close'))guide.hidePopover();});

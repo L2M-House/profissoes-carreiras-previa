@@ -5,6 +5,8 @@
 // reduzido e pausa mostram tudo pronto, com um fade de 150 ms.
 const Cel=(()=>{
  const dlg=$('world-celebration'),pl=(n,um,mais)=>`${n} ${n===1?um:mais}`,SAIDAS=`<button type="button" class="back" data-cel="ir">Voltar à trilha</button><button type="button" class="back" data-cel="parar">Ver meu espaço</button>`;
+ // Lote R1a, fim honesto: sem mundo seguinte pronto, o caminho termina no que a criança fez, e o panorama é o botão principal.
+ const FIM=`<button type="button" class="back" data-cel="ir">Voltar à trilha</button><button type="button" class="btn" data-cel="panorama">Ver meu panorama ${icon('arrow')}</button>`;
  let runs=[],root=null,seq=null,por='mapa';
  function settle(){runs.forEach(a=>{try{a.finish();}catch{}});runs=[];root?.querySelectorAll('[data-n]').forEach(e=>e.textContent=e.dataset.n);}
  // Cada [data-in] entra com mola, em cascata (até 6); "vira" é a carta que começa de costas. Os números ([data-n]) contam de 0 ao valor
@@ -21,7 +23,7 @@ const Cel=(()=>{
  // Carta: o que o profissional faz (só o que a Dra. escreveu), onde a criança o pôs e o que ela escreveu. A figura vem de proFig
  // (parque.js), o único ponto que desenha o profissional (revisão de 20/11).
  const carta=(x,vira,guardar)=>`<li class="carta"${vira?' data-in="vira"':''}>${vira?'<i class="carta-v"></i>':''}<div class="carta-f">${proFig(x.id)}<b>${esc(x.nome)}</b>`+
-  `<p>${x.fala?`“${esc(x.fala)}”`:lacuna('O que este profissional faz: a Dra. Anaí vai escrever.')}</p><p>Você pôs em: ${esc(x.lugares.join(', '))}.${x.ofereceu.length?` Ofereceu ajuda em: ${esc(x.ofereceu.join(', '))}.`:''}</p>`+
+  `${x.fala?`<p>“${esc(x.fala)}”</p>`:CONDUZ?`<p>${lacuna('O que este profissional faz: a Dra. Anaí vai escrever.')}</p>`:''}<p>Você pôs em: ${esc(x.lugares.join(', '))}.${x.ofereceu.length?` Ofereceu ajuda em: ${esc(x.ofereceu.join(', '))}.`:''}</p>`+
   x.escritas.map(d=>`<p class="carta-sua">Você escreveu: “${esc(d.texto)}”</p>`).join('')+(guardar?`<button type="button" class="back" data-cel="lembrar" data-id="${x.id}" aria-pressed="${x.lembrar}">${x.lembrar?'✓ ':''}Quero lembrar</button>`:'')+`</div></li>`;
  const linha=(x,curta)=>`<b>Mundo ${x.n} · ${esc(x.nome)}</b><p>${curta?pl(x.lugares.length,'lugar','lugares')+' com equipe.':x.lugares.map(s=>`${esc(s.lugar)}: ${esc(s.equipe.join(', '))}`).join('<br>')}</p>`+
   (x.resposta?`<p>${esc(x.pergunta)} Você respondeu: <b>${x.resposta}</b>.</p>`:'')+x.escritas.map(d=>`<p class="carta-sua">${esc(d.prof)}, ${esc(d.lugar)}: “${esc(d.texto)}”</p>`).join('');
@@ -76,10 +78,10 @@ const Cel=(()=>{
    pan&&(()=>({html:heroi('teo','acolher')+`<h2>Seu panorama cresceu</h2><div class="cel-linha" data-in><span class="cel-novo">Novo</span> ${linha(pan,1)}</div><p class="trail-lead">Tudo no panorama veio de você.</p>`})),
    // O card lê o mundo seguinte (revisão de 20/11): sem exercício, não promete entrada; oferece a trilha ou o Meu espaço.
    ()=>({html:heroi('rumo','apontar')+(pronto?`<h2>Mundo ${i+2} está aberto</h2><p class="trail-lead">${esc(prox.nome)} é o próximo. Você entra quando quiser.</p>`
-     :`<h2>O próximo mundo está em obras</h2><p class="trail-lead">A Dra. Anaí está preparando o exercício dele. Ele já aparece na trilha.</p>`)+acessorios(),
+     :`<h2>O próximo mundo está em obras</h2><p class="trail-lead">${CONDUZ?'A Dra. Anaí está preparando o exercício dele. ':''}Ele já aparece na trilha.</p>`)+acessorios(),
     acoes:pronto?`<button type="button" class="back" data-cel="parar">Parar por aqui</button><button type="button" class="back" data-cel="ir">Ir para o mundo ${i+2}</button>`
-     :SAIDAS})
-  ],a=>{if(a==='parar')show('painel');else focusMundo();});
+     :FIM})
+  ],a=>{if(a==='parar')show('painel');else if(a==='panorama'){show('painel');const h=$('pan-t');h.scrollIntoView({block:'start',behavior:'instant'});h.focus({preventScroll:true});}else focusMundo();});
  }
  // Fim da etapa: tela cheia, cinco passos. Ninguém chega aqui hoje; "p" vem de quem chama (dados de exemplo no teste).
  function etapa(p){
@@ -106,7 +108,7 @@ const Cel=(()=>{
  function espaco(){
   const p=mundosNow(),cs=Mundos.cartas(p),pan=Mundos.panorama(p),lem=cs.filter(x=>x.lembrar).map(x=>x.nome),filho=programa==='filho';$('painel').toggleAttribute('data-filho',filho);
   $('colecao').innerHTML=!filho&&!cs.length&&!pan.length?'':`<div class="passport-heading"><h2>Minha coleção</h2><p>${cs.length?pl(cs.length,'carta','cartas')+'. ':''}Uma carta para cada profissional que você pôs numa equipe.</p></div>${cs.length?'':'<button type="button" class="btn" data-go="trilha" data-programa="filho">Ir para a trilha</button>'}<ul class="cartas">${cs.map(x=>carta(x,0,1)).join('')}</ul>${pan.length?acessorios():''}`+
-   `<div class="passport-heading"><h2>Meu panorama</h2><p>O que você montou e escreveu. Tudo aqui veio de você.${pan.length?'':' Ele começa quando você terminar o primeiro mundo.'}</p></div><div class="panorama">${pan.map(x=>`<article>${linha(x)}</article>`).join('')}${lem.length?`<p>Cartas que você quer lembrar: ${esc(lem.join(', '))}.</p>`:''}</div>`;
+   `<div class="passport-heading"><h2 id="pan-t" tabindex="-1">Meu panorama</h2><p>O que você montou e escreveu. Tudo aqui veio de você.${pan.length?'':' Ele começa quando você terminar o primeiro mundo.'}</p></div><div class="panorama">${pan.map(x=>`<article>${linha(x)}</article>`).join('')}${lem.length?`<p>Cartas que você quer lembrar: ${esc(lem.join(', '))}.</p>`:''}</div>`;
   vestir();
  }
  vestir();

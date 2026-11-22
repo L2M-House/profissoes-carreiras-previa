@@ -7,7 +7,7 @@
   <meta name="description" content="Conheça o percurso MAPA de Profissões e Carreiras, por Anaí Auada. Uma prévia para pais e filhos explorarem possibilidades no próprio ritmo.">
   <title>Profissões e Carreiras · Anaí Auada</title>
   <link rel="icon" href="media/mapa/bussola.svg" type="image/svg+xml">
-  <link rel="stylesheet" href="site.css?v=45"><link rel="stylesheet" href="elenco.css?v=1">
+  <link rel="stylesheet" href="site.css?v=46"><link rel="stylesheet" href="elenco.css?v=1">
 </head>
 <body data-view="inicio">
   <a class="skip" href="#conteudo">Ir ao conteúdo</a>
@@ -16,7 +16,7 @@
       <img src="media/mapa/bussola.svg" width="42" height="42" alt="">
       <span><strong>Profissões e Carreiras</strong><small>com Anaí Auada</small></span>
     </a>
-    <span class="preview-tag">Prévia da plataforma</span>
+    <span class="preview-tag so-conduz">Prévia da plataforma</span>
     <nav aria-label="Navegação principal">
       <button type="button" data-go="inicio"><span data-icon="home"></span><span>Início</span></button>
       <button type="button" data-go="trilha"><span data-icon="map"></span><span>Rota</span></button>
@@ -33,7 +33,7 @@
           <h1>Antes de escolher, <br><span>explore.</span></h1>
           <p class="lead">Um percurso para pais e filhos entenderem possibilidades, organizarem informações e planejarem os próximos passos.</p>
           <div class="hero-actions">
-            <button type="button" class="btn" data-go="trilha" data-programa="filho">Sou filho ou filha: começar <span data-icon="arrow"></span></button>
+            <button type="button" class="btn" data-go="trilha" data-programa="filho">Quero explorar <span data-icon="arrow"></span></button>
             <button type="button" class="btn btn-ghost" data-go="trilha" data-programa="pais">Sou responsável: ver a rota dos pais</button>
           </div>
           <p class="hero-note">Dá para usar sem entrar. <button type="button" class="hero-login" data-go="entrar">Entrar</button> serve só para guardar as respostas com o seu nome, neste navegador.</p>
@@ -78,7 +78,7 @@
     </section>
 
     <section id="painel" class="view" hidden>
-      <div class="hello"><div><p class="eyebrow" id="painel-kicker">Meu espaço</p><h1 id="ola">Sua rota</h1><p class="lead" id="painel-lead"></p></div><button type="button" class="back" id="sair" hidden>Sair da prévia <span data-icon="arrow"></span></button></div>
+      <div class="hello"><div><p class="eyebrow" id="painel-kicker">Meu espaço</p><h1 id="ola">Sua rota</h1><p class="lead" id="painel-lead"></p></div><button type="button" class="back" id="sair" hidden><span id="sair-texto">Sair da prévia</span> <span data-icon="arrow"></span></button></div>
       <div id="colecao" class="colecao"></div><article class="resume-panel"><div id="resume-character"></div><div><p class="eyebrow">No seu ritmo</p><h2 id="resume-title"></h2><p id="resume-description"></p><button type="button" class="btn" id="resume-action">Retomar</button></div></article><div class="passport-heading"><p class="eyebrow">Passaporte de exploração</p><h2>Descobertas que você guardou.</h2><p>Os selos reconhecem seus registros. As condições aparecem em cada um.</p></div><ul id="passport" class="passport"></ul><details class="route-overview"><summary>Ver a rota ilustrativa e os dados desta prévia</summary><div class="dash"><article class="card card-coral"><h2>Marca no exemplo</h2><p id="painel-marca"></p><button type="button" class="btn" data-go="trilha">Explorar a rota <span data-icon="arrow"></span></button></article><article class="card card-leaf"><h2>Respostas</h2><p id="painel-respostas"></p></article><article class="card card-sun"><h2>Aulas neste navegador</h2><p id="painel-contagem"></p><p id="painel-rumos"></p><button type="button" class="back" data-go="aula" data-editor hidden>Criar ou editar aula <span data-icon="edit"></span></button></article></div>
       <div id="painel-course" class="chart compact"></div></details><div class="records-head"><h2>Seus registros</h2><button type="button" class="back" data-go="experimento">Abrir laboratório <span data-icon="arrow"></span></button></div><div id="saved-records"></div>
     </section>
@@ -86,7 +86,7 @@
     <section id="trilha" class="view" hidden>
       <div class="trail-head"><div><p class="eyebrow">Seu MAPA de possibilidades</p><h1>Todo caminho começa <br>por explorar.</h1><p class="lead" id="trail-description">Pais · visão geral das quatro etapas.</p></div><div class="switch" role="group" aria-label="Programa"><button type="button" id="tab-pais" aria-pressed="true">Pais</button><button type="button" id="tab-filho" aria-pressed="false">Filho</button></div></div>
       <section id="avatar-bar" class="avatar-bar" aria-label="Seu acompanhante" hidden><div class="avatar-current"><img id="avatar-image" src="media/mapa/bussola.svg" alt="" width="64" height="64"><p><small>Na sua companhia</small><strong id="avatar-name">Rumo</strong></p></div><p id="avatar-selection-status" class="fine" role="status" aria-live="polite"></p><details id="avatar-picker" class="avatar-picker"><summary>Escolher ou trocar acompanhante</summary><fieldset><legend>Quem vai explorar com você?</legend><p>Escolha seu animal preferido. Você pode trocar depois.</p><div id="avatar-options" class="avatar-options"></div></fieldset><p id="avatar-status" class="status" role="status" aria-live="polite"></p><div class="avatar-actions"><button type="button" class="btn" id="avatar-confirm">Escolher este animal</button><button type="button" class="back" id="avatar-rumo">Seguir com Rumo</button><button type="button" class="back" id="avatar-later">Agora não</button></div></details></section><section id="bosque" class="bosque" aria-labelledby="world-title" hidden>
-<header class="world-heading"><p class="eyebrow">Etapa 1 de 4 · Exploração · sete mundos</p><h2 id="world-title">Os mundos da exploração.</h2><p class="fine">As etapas seguem o método de Ativação do Desenvolvimento Vocacional (Pelletier), e cada mundo é uma subtarefa da exploração. O primeiro tem conteúdo de exemplo até a lista da Dra. Anaí chegar. O que você faz fica neste navegador. Nada é enviado. As perguntas escritas continuam no laboratório.</p></header>
+<header class="world-heading"><p class="eyebrow">Etapa 1 de 4 · Exploração · sete mundos</p><h2 id="world-title">Os mundos da exploração.</h2><p class="fine so-conduz">As etapas seguem o método de Ativação do Desenvolvimento Vocacional (Pelletier), e cada mundo é uma subtarefa da exploração. O primeiro tem conteúdo de exemplo até a lista da Dra. Anaí chegar. O que você faz fica neste navegador. Nada é enviado. As perguntas escritas continuam no laboratório.</p></header>
 <div id="world-stage" class="world-stage">
 <div class="world-scene">
 <div id="world-viewport" class="world-viewport" data-ready="false"><img src="media/world/bosque-fallback.png" alt="Bosque com uma trilha e sete paradas. Os sete mundos também estão na fila abaixo do mapa." id="world-poster"></div>
@@ -98,7 +98,7 @@
 <div id="world-panel-head" class="world-place-head"><p class="eyebrow" id="world-place-zone"></p><p id="world-place-stage" class="world-place-stage"></p><p id="world-place-state" class="world-place-state"></p></div>
 <p id="world-status" class="world-status" role="status" aria-live="polite"></p><p id="world-live" class="visually-hidden" role="status" aria-live="polite"></p>
 <div id="world-question"></div>
-<p class="fine world-note"><span class="note-long">Teste: suas respostas ficam só neste aparelho.</span><span class="note-short">Teste.</span></p>
+<p class="fine world-note"><span class="note-long">Suas respostas ficam só neste aparelho.</span><span class="note-short">Suas respostas ficam só neste aparelho.</span></p>
 </div>
 </div>
 <div id="world-guide" class="world-guide" popover aria-labelledby="world-guide-title"></div>
@@ -126,9 +126,9 @@
       </div>
     </section>
   </main>
-  <footer><a class="brand" href="#inicio" data-go="inicio"><img src="media/mapa/bussola.svg" width="32" height="32" alt=""><span><strong>Profissões e Carreiras</strong><small>com Anaí Auada</small></span></a><p>Prévia local · Sem cobrança <br>Exploração e desenvolvimento cognitivo.</p><button type="button" class="motion-toggle" id="motion-toggle" aria-pressed="false"><span data-icon="pause"></span><span id="motion-label">Pausar animações</span></button></footer>
+  <footer><a class="brand" href="#inicio" data-go="inicio"><img src="media/mapa/bussola.svg" width="32" height="32" alt=""><span><strong>Profissões e Carreiras</strong><small>com Anaí Auada</small></span></a><p><span class="so-conduz">Prévia local · Sem cobrança <br></span>Exploração e desenvolvimento cognitivo.</p><button type="button" class="motion-toggle" id="motion-toggle" aria-pressed="false"><span data-icon="pause"></span><span id="motion-label">Pausar animações</span></button></footer>
 <dialog id="world-celebration" class="trail-done" aria-labelledby="cel-t"></dialog><dialog id="helper-dialog" class="helper-dialog" aria-labelledby="helper-title"><div class="helper-top"><div id="helper-character"></div><button type="button" class="back" id="helper-close" autofocus>Fechar ajuda</button></div><p class="eyebrow" id="helper-kicker">Pipa · outro jeito de começar</p><h2 id="helper-title"></h2><div id="helper-options" class="helper-options" role="group" aria-label="Tipo de alternativa"><button type="button" class="back" data-helper-option="0" aria-pressed="true">Ler de outro jeito</button><button type="button" class="back" data-helper-option="1" aria-pressed="false">Ver um exemplo fictício</button><button type="button" class="back" data-helper-option="2" aria-pressed="false">Dividir em pequenos passos</button></div><p id="helper-copy"></p><p class="fine">Use a ideia se ajudar. Suas respostas continuam como você escreveu.</p></dialog><noscript><p class="noscript">Ative o JavaScript para explorar as telas desta prévia. As informações da abertura continuam disponíveis.</p></noscript>
-  <script src="journey-contract.js?v=1"></script><script src="elenco.js?v=3"></script><script src="site.js?v=25"></script><script src="companions.js?v=8"></script><script src="mundos.js?v=2"></script><script src="mundos/parque-aquatico.js?v=1"></script><script src="world-bridge.js?v=22"></script><script src="celebracao.js?v=1"></script><script src="parque.js?v=9"></script><script src="experiment.js?v=10"></script>
+  <script src="journey-contract.js?v=1"></script><script src="elenco.js?v=3"></script><script src="site.js?v=26"></script><script src="companions.js?v=8"></script><script src="mundos.js?v=3"></script><script src="mundos/parque-aquatico.js?v=1"></script><script src="world-bridge.js?v=23"></script><script src="celebracao.js?v=2"></script><script src="parque.js?v=10"></script><script src="experiment.js?v=10"></script>
 </body>
 </html>
 

@@ -742,3 +742,30 @@ body[data-programa=filho] #trilha :is(.station-degree,.dock-bearing,.map-directi
 .cel-desc .back{margin:0}.cel-equipe li:has(.cel-desc){grid-column:1/-1}
 @media(max-width:599px){.cel{padding:8px 14px 16px}.cel h2{font-size:22px}.cel .trail-rumo{width:88px}.cel-fatos b{font-size:32px}.cartas{grid-template-columns:repeat(auto-fill,minmax(min(100%,148px),1fr))}.cel-acc .companion{width:52px}}
 @media(max-height:640px) and (min-aspect-ratio:4/3){.cel{grid-template-columns:1fr;justify-items:center;width:min(100%,760px);text-align:center;padding:6px 16px 10px}.cel .trail-rumo{display:none}.cel h2{font-size:20px}.cel-foto{width:auto;height:112px;aspect-ratio:auto}.cel-bosque .companion{width:12%}.cel-fatos li{display:flex;align-items:center;justify-content:center;gap:8px;padding:4px 8px}.cel-fatos b{font-size:26px}.cel-pe>*{min-height:44px}}
+/* Lote R1a: caminho limpo. Sem ?conduz no endereço vale o modo da criança, e o que é bastidor (selos de exemplo, prévia, convites ao
+   laboratório) não aparece. No "Meu espaço" do Filho ficam a coleção e o panorama; nada é apagado, e os Pais veem como antes. */
+body:not([data-conduz]) .so-conduz{display:none}
+body:not([data-conduz]) #painel[data-filho]>:is(.resume-panel,.route-overview,.records-head,#saved-records){display:none}
+#pan-t{scroll-margin-top:calc(var(--top-h,0px) + 16px)}
+/* Cartão do mundo: o nome, o convite e o botão. A numeração do método fica recolhida em "Sobre o método". */
+#world-stage .mundo-fields .mundo-convite{font-size:17px;font-weight:800}
+.mundo-metodo{color:var(--muted)}
+.mundo-metodo>summary{display:inline-flex;align-items:center;gap:10px;padding:0;font-size:14px;font-weight:800}
+/* Sem texto novo: uma seta diz que abre, e gira quando está aberto. */
+.mundo-metodo>summary::before{content:'';flex:none;width:8px;height:8px;margin-left:2px;border-right:2px solid currentColor;border-bottom:2px solid currentColor;transform:rotate(-45deg)}
+.mundo-metodo[open]>summary::before{transform:rotate(45deg)}
+#world-stage .mundo-fields .mundo-metodo p{font-size:14px;margin:0 0 4px}
+/* Lista de lugares: o nome e o estado na primeira linha, a atividade inteira embaixo. Lugar em obras não é botão. */
+.mundo-lugares{grid-template-columns:repeat(auto-fill,minmax(min(100%,320px),1fr))}
+.mundo-lugares>li{display:flex}
+/* A partir de 900 px a lista fica mais junta: em 1280×720 a segunda fileira cabia por 1 px a menos que o painel. */
+@media(min-width:900px){.mundo-lugares{gap:6px;margin-top:4px}}
+.mundo-lugar>span:last-child{display:flex;flex-wrap:wrap;align-items:baseline;gap:0 8px;flex:1}
+.mundo-lugar b,.mundo-lugar small{display:inline}
+.mundo-ativ,.mundo-lugar .mundo-lacuna{flex-basis:100%;font-size:14px;line-height:1.35}
+.mundo-lugares>li[data-obra] .mundo-lugar{border-style:dashed;box-shadow:none;background:transparent;color:var(--muted);cursor:default}
+.mundo-lugares>li[data-obra] .node-glyph{border-style:dashed;border-color:var(--muted);background:transparent}
+.world-node[data-look=obras]{border-style:dashed;color:var(--muted)}
+.park-tag[data-obra]{border-style:dashed;color:var(--muted)}
+/* No celular a lista é uma coluna, mais junta, para os quatro lugares abertos caberem inteiros em 390×844 também com o parque pronto. */
+@media(max-width:599px){.mundo-lugares{grid-template-columns:repeat(2,minmax(0,1fr));gap:6px}.mundo-lugares>li:not([data-obra]){grid-column:1/-1}.mundo-lugar{min-height:48px;padding-top:4px;padding-bottom:4px}}

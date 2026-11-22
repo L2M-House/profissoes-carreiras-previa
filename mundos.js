@@ -30,10 +30,17 @@ const Mundos=(()=>{
  const equipe=(m,lugar)=>Array.isArray(m.equipes?.[lugar])?m.equipes[lugar]:[];
  // Um lugar está resolvido com pelo menos um profissional na equipe; não há escolha errada nem quantidade certa.
  const lugarFeito=(m,lugar)=>equipe(m,lugar).length>0;
- const parqueCompleto=(c,m)=>!!c&&c.lugares.every(l=>lugarFeito(m,l.id));
- // Editar depois de concluir não reabre nada: o mundo segue feito enquanto todo lugar tiver equipe (tirar a última pessoa de um
+ // Lote R1a: lugar sem atividade escrita fica em obras. Ele não abre e não conta para fechar o parque; quando a lista da Dra. Anaí
+ // preencher a atividade, ele passa a contar sem mexer aqui. Quem já pôs equipe num lugar em obras não perde nada: a equipe, a carta e a
+ // linha do panorama ficam, e o mundo concluído continua concluído.
+ const emObras=l=>!l?.atividade;
+ const abertos=c=>c?c.lugares.filter(l=>!emObras(l)):[];
+ const parqueCompleto=(c,m)=>abertos(c).length>0&&abertos(c).every(l=>lugarFeito(m,l.id));
+ // "n de N lugares com equipe", só com os lugares que contam.
+ const contagem=(c,m)=>({feitos:abertos(c).filter(l=>lugarFeito(m,l.id)).length,de:abertos(c).length});
+ // Editar depois de concluir não reabre nada: o mundo segue feito enquanto todo lugar aberto tiver equipe (tirar a última pessoa de um
  // lugar desfaz, como apagar uma resposta no 5.11).
- // O mundo termina com todos os lugares resolvidos e a pergunta do fechamento respondida (sim ou não).
+ // O mundo termina com todos os lugares abertos resolvidos e a pergunta do fechamento respondida (sim ou não).
  const mundoFeito=(c,m)=>parqueCompleto(c,m)&&['sim','nao'].includes(m.fechamento)&&m.concluido===true;
  function feito(p,i,todos){const c=conteudo(i,todos);return !!c&&mundoFeito(c,doMundo(p,LISTA[i].conteudo));}
  // Um mundo abre quando o anterior terminou; o primeiro está sempre aberto. Sem conteúdo, ele abre e fica em preparação.
@@ -79,7 +86,7 @@ const Mundos=(()=>{
    return [{n:i+1,nome:c.titulo,lugares:sintese(c,m).filter(s=>s.equipe.length),pergunta:c.fechamento,resposta:{sim:'Sim',nao:'Não'}[m.fechamento]||null,
     escritas:c.lugares.flatMap(l=>equipe(m,l.id).map(x=>({lugar:l.nome,prof:c.profissionais.find(q=>q.id===x)?.nome||x,texto:descricao(m,l.id,x)})).filter(d=>d.texto))}];});
  }
- return Object.freeze({ETAPA,LISTA,conteudo,decode,pessoa,gravar,doMundo,equipe,lugarFeito,parqueCompleto,mundoFeito,feito,aberto,incluir,retirar,fala,voluntario,sintese,
+ return Object.freeze({ETAPA,LISTA,conteudo,decode,pessoa,gravar,doMundo,equipe,lugarFeito,emObras,contagem,parqueCompleto,mundoFeito,feito,aberto,incluir,retirar,fala,voluntario,sintese,
   ACESSORIOS,colecionar,descricao,descrever,lembrar,fatos,cartas,panorama});
 })();
 if(typeof module!=='undefined')module.exports=Mundos;

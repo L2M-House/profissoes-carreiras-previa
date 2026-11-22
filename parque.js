@@ -20,61 +20,70 @@ const proName=(c,id)=>c.profissionais.find(p=>p.id===id)?.nome||id;
 function paintMundoPanel(d=mundosDomain()){
  const host=$('mundo-fields');if(!host)return;const c=parkContent(),p=d.p,m=Mundos.doMundo(p,PARK_ID);
  const view=park.open?park.view:'mundo',key=JSON.stringify([view,d.atual,park.lugar,park.pick,park.fala,m,owner(),park.novas,park.desc]);
- if(key===park.key)return;park.key=key;
+ if(key===park.key)return;park.key=key;if(tipStep>=0&&view!=='lugar')endTips();// a dica do gesto não fica solta fora do lugar
  const had=document.activeElement?.closest?.('#world-stage')?document.activeElement.dataset.k:null;
  $('world-stage').toggleAttribute('data-park',park.open);$('park-places').hidden=!park.open;$('world-nodes').hidden=park.open;
  const [fields,actions]=view==='mundo'?mundoCard(d,c,m):view==='lugar'?lugarView(c,m):view==='equipe'?Cel.lugar(c,m,c.lugares[park.lugar],park.novas,Mundos.parqueCompleto(c,m),park.desc):view==='fechamento'?fechamentoView(c,m):parqueView(c,m);
- $('world-place-state').innerHTML=(view!=='mundo'||d.atual===0)&&c?.exemplo?EXEMPLO:'';
+ $('world-place-state').innerHTML=CONDUZ&&(view!=='mundo'||d.atual===0)&&c?.exemplo?EXEMPLO:'';
  host.style.paddingBottom='';host.dataset.view=view;host.innerHTML=fields;$('mundo-actions').innerHTML=actions;fillIcons(host);fillIcons($('mundo-actions'));
  if(park.open)paintPlaces(c,m);
  if(had){const e=$('world-stage').querySelector(`[data-k="${had}"]`);if(e&&!e.disabled)e.focus({preventScroll:true});}
 }
-// O aviso de exemplo fica no topo, na linha do "Mundo 1 de 7", em toda vista do parque (não toma a altura da atividade).
-const exemplo=()=>'';
+// Lote R1a: o selo de exemplo e as lacunas ("a Dra. Anaí vai escrever") são bastidor e só aparecem para quem conduz (?conduz, site.js).
+// O selo fica no topo, na linha do "Mundo 1 de 7", em toda vista do parque (não toma a altura da atividade).
 const EXEMPLO='<span class="mundo-exemplo" title="A lista de atividades e profissionais da Dra. Anaí ainda vai chegar.">Conteúdo de exemplo</span>';
-const lacuna=t=>`<span class="mundo-lacuna">${t}</span>`;
+const lacuna=t=>`<span class="mundo-lacuna">${t}</span>`,bastidor=t=>CONDUZ?lacuna(t):'';
+// A numeração do Pelletier e a frase do método, inteira, ficam recolhidas; quem conduz já as vê abertas.
+const metodo=(i,texto)=>`<details class="mundo-metodo"${CONDUZ?' open':''}><summary data-k="metodo">Sobre o método</summary><p>Subtarefa ${i+1} de 7</p>${texto?`<p>${texto}</p>`:''}</details>`;
+// Cartão do mundo: o nome, o convite (texto de jogo, da L2M) e o botão.
 function mundoCard(d,c,m){
  const i=d.atual,s=d.steps[i],L=Mundos.LISTA[i];
- if(!c||i>0)return [`<p class="eyebrow">Subtarefa ${i+1} de 7</p><h1 tabindex="-1">${esc(L.nome)}</h1>`+
-  `<p class="mundo-sub">${L.subtarefa?esc(L.subtarefa):lacuna('O nome desta subtarefa ainda vai chegar.')}</p><p class="mundo-prep"><span class="node-glyph" aria-hidden="true">${LOOK_GLYPH.preparo}</span> Em preparação. A Dra. Anaí está preparando o exercício deste mundo.</p>`,`<button type="button" class="back" data-park="mundo1" data-k="mundo1"><span data-icon="back"></span>Voltar ao parque aquático</button>`];
- const n=c.lugares.filter(l=>Mundos.lugarFeito(m,l.id)).length;
- return [`<p class="eyebrow">Subtarefa 1 de 7</p><h1 tabindex="-1">${esc(c.titulo)}</h1>${exemplo(c)}<p class="mundo-sub">${esc(c.subtarefa)}</p><p class="mundo-enunciado">${esc(c.enunciado)}</p>`+
-  `<p class="mundo-conta">${s.done?'Mundo terminado. ':''}${n} de ${c.lugares.length} lugares com equipe.</p>`,
-  `<button type="button" class="btn" data-park="abrir" data-k="abrir">${s.done||n?'Voltar ao parque':'Entrar no parque'} <span data-icon="arrow"></span></button>`];
+ if(!c||i>0)return [`<h1 tabindex="-1">${esc(L.nome)}</h1><p class="mundo-prep"><span class="node-glyph" aria-hidden="true">${LOOK_GLYPH.preparo}</span> Este mundo está em obras.${CONDUZ?' A Dra. Anaí está preparando o exercício deste mundo.':''}</p>`+
+  metodo(i,L.subtarefa?esc(L.subtarefa):bastidor('O nome desta subtarefa ainda vai chegar.')),`<button type="button" class="back" data-park="mundo1" data-k="mundo1"><span data-icon="back"></span>Voltar ao parque aquático</button>`];
+ const k=Mundos.contagem(c,m);
+ return [`<h1 tabindex="-1">${esc(c.titulo)}</h1><p class="mundo-convite">Todo lugar tem um problema. Quem resolve?</p>`+
+  (s.done||k.feitos?`<p class="mundo-conta">${s.done?'Mundo terminado. ':''}${k.feitos} de ${k.de} lugares com equipe.</p>`:'')+metodo(0,esc(c.subtarefa)),
+  `<button type="button" class="btn" data-park="abrir" data-k="abrir">${s.done||k.feitos?'Voltar ao parque':'Entrar no parque'} <span data-icon="arrow"></span></button>`];
 }
+// A lista diz a atividade de cada lugar, inteira, como está no arquivo do mundo. Lugar sem atividade aparece em obras e não abre.
 function parqueView(c,m){
- const n=c.lugares.filter(l=>Mundos.lugarFeito(m,l.id)).length,all=n===c.lugares.length;
- return [`${exemplo(c)}<h1 tabindex="-1">${all?'Todos os lugares têm equipe.':'Por onde você quer começar?'}</h1><p class="mundo-enunciado">${esc(c.enunciado)}</p>`+
-  `<ul class="mundo-lugares">${c.lugares.map((l,i)=>{const t=Mundos.equipe(m,l.id).length;return `<li><button type="button" class="mundo-lugar" data-lugar="${i}" data-k="lugar-${i}" data-feito="${t>0}"><span class="node-glyph" aria-hidden="true">${t?'✓':i+1}</span><span><b>${esc(l.nome)}</b><small>${t?`Equipe com ${t}`:'Sem equipe'}</small></span></button></li>`;}).join('')}</ul>`,
+ const k=Mundos.contagem(c,m),all=k.feitos===k.de;
+ return [`<h1 tabindex="-1">${all?'O parque está pronto para abrir.':'Por onde você quer começar?'}</h1><p class="mundo-enunciado">${esc(c.enunciado)}</p>`+
+  `<ul class="mundo-lugares">${c.lugares.map((l,i)=>{const t=Mundos.equipe(m,l.id).length;
+   return Mundos.emObras(l)?`<li data-obra><div class="mundo-lugar"><span class="node-glyph" aria-hidden="true">${LOOK_GLYPH.preparo}</span><span><b>${esc(l.nome)}</b><small>Em obras</small>${bastidor('A Dra. Anaí vai escrever a atividade deste lugar.')}</span></div></li>`
+    :`<li><button type="button" class="mundo-lugar" data-lugar="${i}" data-k="lugar-${i}" data-feito="${t>0}"><span class="node-glyph" aria-hidden="true">${t?'✓':i+1}</span><span><b>${esc(l.nome)}</b><small>${t?`Equipe com ${t}`:'Sem equipe'}</small><span class="mundo-ativ">${esc(l.atividade)}</span></span></button></li>`;}).join('')}</ul>`,
   `<button type="button" class="back" data-park="trilha" data-k="trilha"><span data-icon="back"></span>Voltar à trilha</button>`+(all?`<button type="button" class="btn" data-park="fechar" data-k="fechar">Ver o parque completo <span data-icon="arrow"></span></button>`:'')];
 }
 function lugarView(c,m){
  const l=c.lugares[park.lugar],team=Mundos.equipe(m,l.id),f=park.fala;
  const pick=park.pick&&!team.includes(park.pick)?park.pick:null;
  const fala=!f?'':f.vol?`<div class="mundo-fala" data-vol><p><b>${esc(proName(c,f.prof))}:</b> ${esc(f.texto)}</p><div class="mundo-vol"><button type="button" class="btn" data-vol="sim" data-k="vol-sim">Pôr na equipe</button><button type="button" class="back" data-vol="nao" data-k="vol-nao">Seguir sem</button></div></div>`
-  :`<div class="mundo-fala"><p><b>${esc(proName(c,f.prof))}:</b> ${esc(f.texto)}${f.lacuna?' '+lacuna('O que eu faria aqui: a Dra. Anaí vai escrever.'):''}</p>${f.explicacao?`<p class="mundo-explica">${esc(f.explicacao)}</p>`:''}</div>`;
- return [`${exemplo(c)}<p class="eyebrow">${esc(l.nome)}</p><h1 tabindex="-1">${l.atividade?esc(l.atividade):'Atividade a definir.'}</h1>${l.atividade?'':`<p>${lacuna('A Dra. Anaí vai escrever a atividade deste lugar.')}</p>`}`+
-  `<p class="mundo-dica" id="mundo-dica">Arraste, ou toque no profissional e na equipe.<span class="visually-hidden"> No teclado, Enter no profissional.</span></p><ul class="mundo-pros" aria-describedby="mundo-dica">${c.profissionais.map(p=>{const on=team.includes(p.id);return `<li><button type="button" class="mundo-pro" data-pro="${p.id}" data-k="pro-${p.id}" aria-pressed="${pick===p.id}" ${on?'data-on':''} aria-label="${esc(p.nome)}${on?', na equipe':''}">${proFig(p.id)}<span>${esc(p.nome)}${on?'<small>Na equipe ✓</small>':pick===p.id?'<small>Escolhido: toque na equipe</small>':''}</span></button></li>`;}).join('')}</ul>`+
-  `<div class="mundo-equipe" data-drop data-k="equipe" ${pick?'data-pick':''}><p class="mundo-equipe-titulo">${team.length?'<b>Equipe:</b>':'<b>Equipe desta atividade</b><small>Arraste um profissional para cá.</small>'}</p>`+
+  :`<div class="mundo-fala"><p><b>${esc(proName(c,f.prof))}:</b> ${esc(f.texto)}${f.lacuna&&CONDUZ?' '+lacuna('O que eu faria aqui: a Dra. Anaí vai escrever.'):''}</p>${f.explicacao?`<p class="mundo-explica">${esc(f.explicacao)}</p>`:''}</div>`;
+ // O gesto se ensina uma vez, na dica do Rumo (world-bridge.js); aqui fica a pergunta do jogo. Lugar em obras não chega a esta vista.
+ return [`<p class="eyebrow">${esc(l.nome)}</p><h1 tabindex="-1">${esc(l.atividade)}</h1>`+
+  `<p class="mundo-dica" id="mundo-dica">Quem pode ajudar aqui?<span class="visually-hidden"> Arraste o profissional até a equipe, ou toque nele e depois na equipe. No teclado, Enter no profissional.</span></p><ul class="mundo-pros" aria-describedby="mundo-dica">${c.profissionais.map(p=>{const on=team.includes(p.id);return `<li><button type="button" class="mundo-pro" data-pro="${p.id}" data-k="pro-${p.id}" aria-pressed="${pick===p.id}" ${on?'data-on':''} aria-label="${esc(p.nome)}${on?', na equipe':''}">${proFig(p.id)}<span>${esc(p.nome)}${on?'<small>Na equipe ✓</small>':pick===p.id?'<small>Escolhido: toque na equipe</small>':''}</span></button></li>`;}).join('')}</ul>`+
+  `<div class="mundo-equipe" data-drop data-k="equipe" ${pick?'data-pick':''}><p class="mundo-equipe-titulo">${team.length?'<b>Equipe:</b>':'<b>Sua equipe</b>'}</p>`+
   `<ul class="mundo-time">${team.map(id=>`<li>${proFig(id)}<span>${esc(proName(c,id))}</span><button type="button" class="mundo-tirar" data-tirar="${id}" data-k="tirar-${id}" aria-label="Tirar ${esc(proName(c,id))} da equipe">×</button></li>`).join('')}</ul>`+
   (pick?`<button type="button" class="btn mundo-por" data-por data-k="por">Pôr ${esc(proName(c,pick))} na equipe</button>`:'')+`</div>${fala}`,
-  `<button type="button" class="back" data-park="parque" data-k="parque"><span data-icon="back"></span>Voltar ao parque</button><button type="button" class="btn" data-park="pronto" data-k="pronto">Pronto <span data-icon="arrow"></span></button>`];
+  `<button type="button" class="back" data-park="parque" data-k="parque"><span data-icon="back"></span>Voltar ao parque</button><button type="button" class="btn" data-park="pronto" data-k="pronto">Fechar a equipe <span data-icon="arrow"></span></button>`];
 }
 function fechamentoView(c,m){
  const a=m.fechamento,resp=c.respostaFechamento?.[a];
- return [`${exemplo(c)}<p class="eyebrow">Parque completo</p><h1 tabindex="-1">Todos os lugares do parque têm equipe.</h1>`+
-  `<fieldset class="mundo-pergunta"><legend>${esc(c.fechamento)}</legend><div class="mundo-simnao"><button type="button" class="back" data-fecho="sim" data-k="sim" aria-pressed="${a==='sim'}">Sim</button><button type="button" class="back" data-fecho="nao" data-k="nao" aria-pressed="${a==='nao'}">Não</button></div></fieldset>`+
-  (a?`${resp?`<p>${esc(resp)}</p>`:`<p>${lacuna('A conversa da Dra. Anaí depois do sim ou do não vai entrar aqui.')}</p>`}<h2 class="mundo-sintese-titulo">O que você montou</h2><dl class="mundo-sintese">${Mundos.sintese(c,m).map(s=>`<div><dt>${esc(s.lugar)}</dt><dd>${esc(s.equipe.join(', '))}</dd></div>`).join('')}</dl>`:''),
-  `<button type="button" class="back" data-park="parque" data-k="parque"><span data-icon="back"></span>Voltar ao parque</button><button type="button" class="btn" data-park="concluir" data-k="concluir">Concluir o mundo <span data-icon="arrow"></span></button>`];
+ return [`<p class="eyebrow">Parque completo</p><h1 tabindex="-1">O parque está pronto para abrir.</h1>`+
+  `<fieldset class="mundo-pergunta"><legend>${esc(c.fechamento)}</legend><div class="mundo-simnao"><button type="button" class="back" data-fecho="sim" data-k="sim" aria-pressed="${a==='sim'}">${a==='sim'?'✓ ':''}Sim</button><button type="button" class="back" data-fecho="nao" data-k="nao" aria-pressed="${a==='nao'}">${a==='nao'?'✓ ':''}Não</button></div></fieldset>`+
+  // A lista só tem os lugares com equipe: lugar em obras não entra, e a equipe que alguém já tinha posto nele continua aqui.
+  (a?`${resp?`<p>${esc(resp)}</p>`:CONDUZ?`<p>${lacuna('A conversa da Dra. Anaí depois do sim ou do não vai entrar aqui.')}</p>`:''}<h2 class="mundo-sintese-titulo">O que você montou</h2><dl class="mundo-sintese">${Mundos.sintese(c,m).filter(s=>s.equipe.length).map(s=>`<div><dt>${esc(s.lugar)}</dt><dd>${esc(s.equipe.join(', '))}</dd></div>`).join('')}</dl>`:''),
+  `<button type="button" class="back" data-park="parque" data-k="parque"><span data-icon="back"></span>Voltar ao parque</button><button type="button" class="btn" data-park="concluir" data-k="concluir">Abrir o parque <span data-icon="arrow"></span></button>`];
 }
 // Lista de lugares na base do mapa (a mesma fila das paradas, com os lugares) e rótulos sobre o 3D.
 function paintPlaces(c,m){
  const list=$('park-places');if(list.children.length!==c.lugares.length)list.innerHTML=c.lugares.map((l,i)=>`<li><button type="button" class="world-node land-leaf" data-park-lugar="${i}" data-k="place-${i}"></button><span class="node-name" aria-hidden="true"><b>${esc(l.nome)}</b><small></small></span></li>`).join('');
- c.lugares.forEach((l,i)=>{const b=list.children[i].firstChild,t=Mundos.equipe(m,l.id).length,look=noLugar()&&park.lugar===i?'aqui':t?'feita':'aberta';b.dataset.look=look;b.innerHTML=`<span class="node-glyph">${t?'✓':i+1}</span>`;
-  b.toggleAttribute('aria-current',look==='aqui');b.setAttribute('aria-label',`Lugar ${i+1} de ${c.lugares.length}, ${l.nome}: ${t?`equipe com ${t}`:'sem equipe'}`);list.children[i].lastChild.lastChild.textContent=look==='aqui'?'Você está aqui':t?'Com equipe':'Sem equipe';});
+ // Lote R1a: lugar em obras fica na fila e no mapa com "…" e "Em obras", tracejado; tocar nele diz que está em obras (openLugar).
+ c.lugares.forEach((l,i)=>{const b=list.children[i].firstChild,t=Mundos.equipe(m,l.id).length,obra=Mundos.emObras(l),look=obra?'obras':noLugar()&&park.lugar===i?'aqui':t?'feita':'aberta';b.dataset.look=look;b.innerHTML=`<span class="node-glyph">${obra?LOOK_GLYPH.preparo:t?'✓':i+1}</span>`;
+  b.toggleAttribute('aria-current',look==='aqui');b.toggleAttribute('aria-disabled',obra);b.setAttribute('aria-label',`Lugar ${i+1} de ${c.lugares.length}, ${l.nome}: ${obra?'em obras':t?`equipe com ${t}`:'sem equipe'}`);list.children[i].lastChild.lastChild.textContent=obra?'Em obras':look==='aqui'?'Você está aqui':t?'Com equipe':'Sem equipe';});
  parkView?.paint(c.lugares.map(l=>({feito:Mundos.lugarFeito(m,l.id),equipe:Mundos.equipe(m,l.id).map(id=>PRO_COLOR[id]||'#5e6880')})));parkView?.select(noLugar()?park.lugar:-1);
  const tags=$('world-viewport').querySelector('.park-tags');if(tags&&!tags.children.length)tags.innerHTML=c.lugares.map((l,i)=>`<span class="park-tag" data-i="${i}"><b>${esc(l.nome)}</b><small></small><i></i></span>`).join('');
- tags?.querySelectorAll('.park-tag').forEach((t,i)=>{const n=Mundos.equipe(m,c.lugares[i].id).length,aqui=noLugar()&&park.lugar===i;t.children[1].textContent=aqui?'Você está aqui':n?'✓ Com equipe':'Sem equipe';t.children[2].textContent=n?'✓':i+1;t.dataset.feito=String(n>0);t.toggleAttribute('data-aqui',aqui);});
+ tags?.querySelectorAll('.park-tag').forEach((t,i)=>{const n=Mundos.equipe(m,c.lugares[i].id).length,obra=Mundos.emObras(c.lugares[i]),aqui=noLugar()&&park.lugar===i;t.children[1].textContent=obra?'Em obras':aqui?'Você está aqui':n?'✓ Com equipe':'Sem equipe';t.children[2].textContent=obra?LOOK_GLYPH.preparo:n?'✓':i+1;t.dataset.feito=String(n>0&&!obra);t.toggleAttribute('data-obra',obra);t.toggleAttribute('data-aqui',aqui);});
  if(parkView)layoutParkTags(parkView.anchors());
 }
 // Lote 6.2: um rótulo nunca cobre as peças de um lugar nem outro rótulo. Em cima do lugar, embaixo, dos lados ou nos cantos, o que primeiro
@@ -123,7 +132,10 @@ function closePark(instant=false){
  if(pass){const c=$('world-viewport').querySelector('.park-canvas'),open={opacity:1,transform:'scale(1)'},closed={opacity:0,transform:'scale(1.16)'};
   startParkPass('out',[passAnim(c,[open,{...closed,offset:.6},closed]),passAnim(mapLayer,[{opacity:0},{opacity:0,offset:.6},{opacity:1}])],()=>worldView.emerge(0));}
 }
-function openLugar(i){if(!park.open)return;park.view='lugar';park.lugar=i;park.pick=null;park.fala=null;paintWorld();focusMundo();}
+// Lote R1a: lugar em obras não abre, por nenhum caminho (lista, fila, rótulo ou toque no 3D): a faixa de mensagens diz por quê.
+// Na primeira vez que um lugar abre, o Rumo mostra o gesto de montar a equipe (a única dica, world-bridge.js).
+function openLugar(i){if(!park.open)return;const l=parkContent().lugares[i];if(Mundos.emObras(l)){status('mundo-status',`${l.nome} está em obras.`);mundoSay(`${l.nome} está em obras.`);return;}
+ park.view='lugar';park.lugar=i;park.pick=null;park.fala=null;if($('mundo-status').dataset.error!=='true')status('mundo-status','');paintWorld();focusMundo();maybeTip();}
 // QA B5: quando a fala (ou a oferta) abre e não cabe, o painel desce até ela; se o corte cairia no meio do lugar ou da atividade,
 // desce até a linha da dica, com uma folga no fim do painel se precisar, e o título sai inteiro.
 function showFala(){const f=$('mundo-fields'),fala=f.querySelector('.mundo-fala');if(!fala)return;const fr=f.getBoundingClientRect(),b=fala.getBoundingClientRect();if(b.bottom<=fr.bottom+1&&b.top>=fr.top-1)return;
@@ -166,7 +178,7 @@ function donePlace(){
 // Lote 6.3: ao terminar um lugar, a equipe entra na coleção e só depois de gravar o card do lugar aparece. Sem gravar, não há card.
 function leavePlace(c,p){
  const l=c.lugares[park.lugar],r=Mundos.colecionar(p,PARK_ID,l.id),m=Mundos.doMundo(r.p,PARK_ID),ok=saveMundos(r.p);park.fala=null;park.pick=null;park.desc=null;park.novas=r.novas;
- const dito=`${l.nome} com equipe. ${c.lugares.filter(x=>Mundos.lugarFeito(m,x.id)).length} de ${c.lugares.length} lugares.`;
+ const k=Mundos.contagem(c,m),dito=`${l.nome} com equipe. ${k.feitos} de ${k.de} lugares.`;
  if(ok){park.view='equipe';status('mundo-status','');paintWorld();mundoSay(dito+(r.novas.length?` Carta nova: ${r.novas.map(x=>proName(c,x)).join(', ')}.`:''));focusMundo();Cel.entrar($('mundo-fields'),60);return;}
  park.view=Mundos.parqueCompleto(c,m)?'fechamento':'parque';const from=park.lugar;park.lugar=-1;paintWorld();status('mundo-status','Não deu para guardar neste navegador. A equipe fica nesta tela enquanto ela estiver aberta.',true);
  mundoSay(dito);if(park.view!=='parque'||!focusLugar(from))focusMundo();
@@ -190,7 +202,7 @@ function concludeWorld(){
  closePark(true);paintWorld();
  if(!worldView||worldFailed){$('world-live').textContent='Mundo 1 de 7 concluído.';focusMundo();after?.();return;}
  worldView.setActive(true);if(!first)cheered.add(0);// a comemoração vem uma vez por mundo, como no 5.11
- passPhase(0,{title:'Mundo 1 de 7 concluído',done:`${c.lugares.length} lugares com equipe`,guard:400,after});
+ passPhase(0,{title:'Mundo 1 de 7 concluído',done:`${Mundos.fatos(c,m).lugares} lugares com equipe`,guard:400,after});// o que ela montou: 4 hoje, 6 em quem tinha equipe nos lugares em obras
 }
 // Arrastar: o profissional segue o dedo ou o ponteiro numa cópia; solto sobre a equipe, entra nela. Um toque sem arrastar escolhe
 // o profissional, e o toque seguinte na equipe o põe lá. No teclado (clique sem ponteiro), Enter põe direto.
